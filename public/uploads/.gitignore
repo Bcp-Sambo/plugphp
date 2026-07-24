@@ -1,0 +1,4 @@
+# Keep this directory tracked, but never commit uploaded files.
+*
+!.gitignore
+!.htaccess

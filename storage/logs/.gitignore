@@ -1,0 +1,4 @@
+# Keep this directory in version control, but never commit the log files
+# themselves. public/index.php writes php-error.log here in production.
+*
+!.gitignore

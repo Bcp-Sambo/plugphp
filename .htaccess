@@ -1,0 +1,33 @@
+# PlugPHP — project-root .htaccess (defense in depth).
+#
+# The CORRECT deployment points the domain's document root at the public/
+# subdirectory (see docs/DEPLOY.md), which keeps this file, .env, core/,
+# config/ and storage/ entirely outside the web root.
+#
+# This file only does anything if the document root was mistakenly set to
+# the project root instead of public/. In that case it blocks direct access
+# to the sensitive files that would otherwise be exposed.
+
+Options -Indexes
+
+# Block the environment file and any other dotfile outright.
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Belt and braces: explicitly block the env files by name too.
+<FilesMatch "^(\.env|\.env\.example)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

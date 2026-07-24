@@ -1,0 +1,10 @@
+# config/ holds modules.php and the install lock — never needs to be served
+# over the web. Denied here as defense in depth for a misconfigured docroot
+# (the correct setup keeps it outside the web root; document root = public/).
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

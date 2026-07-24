@@ -1,0 +1,37 @@
+# PlugPHP front controller (Apache / cPanel)
+#
+# This lives in the web-exposed public/ directory. It sends every request
+# that is not a real file/folder to index.php, which then dispatches through
+# core/Router.php. Without it, clean URLs like /login or /blog/{slug} would
+# 404 at the web-server level before PHP ever runs.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS. LEAVE THIS COMMENTED until SSL is active for the domain
+    # (cPanel AutoSSL), otherwise you can hit a redirect loop while the
+    # certificate is still provisioning. Uncomment once https:// works.
+    # RewriteCond %{HTTPS} !=on
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Serve real files and directories directly (CSS, JS, uploaded images).
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Everything else -> the front controller.
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Never serve dotfiles (e.g. a stray .env) from the web root.
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

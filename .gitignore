@@ -1,0 +1,24 @@
+# PlugPHP — repository ignore rules.
+#
+# NOTE: vendor/ is intentionally COMMITTED so that a plain "Download ZIP"
+# from GitHub is ready to run with no Composer step. Do not add it here.
+
+# Per-site configuration and install state — never commit these.
+/.env
+/config/installed.lock
+
+# Production error logs (the storage/logs folder itself is kept).
+/storage/logs/*.log
+
+# User-uploaded media (the public/uploads folder itself is kept).
+/public/uploads/*
+!/public/uploads/.gitignore
+!/public/uploads/.htaccess
+
+# Local Claude Code settings (per-machine, not part of the template)
+/.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

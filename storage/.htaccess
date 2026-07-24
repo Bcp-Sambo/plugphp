@@ -1,0 +1,11 @@
+# storage/ must never be reachable over the web — it holds the production
+# error log, which can contain sensitive detail. Under the correct setup
+# (document root = public/) this directory is already outside the web root;
+# this file is defense in depth for a misconfigured docroot.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

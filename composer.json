@@ -1,0 +1,24 @@
+{
+    "name": "kabirusambo/plugphp",
+    "description": "PlugPHP — a modular, agent-ready vanilla-PHP starter kit for shared/cPanel hosting.",
+    "type": "project",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Kabiru Sambo",
+            "homepage": "https://bubblebotsolutions.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "": "core/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
