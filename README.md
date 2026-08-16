@@ -106,6 +106,19 @@ verification pass, and troubleshooting.
 
 ---
 
+## Documentation
+
+Full developer documentation lives in **[docs/](docs/)**:
+
+- [Getting Started](docs/getting-started.md) — install paths, first run, the dev loop
+- [Architecture](docs/architecture.md) — request lifecycle, `core/` vs `modules/`, routing
+- [Core API Reference](docs/core-api.md) — every `core/` class and method
+- [Building a Module](docs/building-a-module.md) — add a feature end to end
+- [Theming & Branding](docs/theming.md) — layout, CSS, logo, per-site branding
+- [Security Model](docs/security.md) — the structural controls and their rules
+- [Extending with an AI Agent](docs/agents.md) — the `SKILL.md` system
+- [Deployment](docs/DEPLOY.md) — production checklist + creating a DB in cPanel
+
 ## Project layout
 
 ```
