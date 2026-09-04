@@ -1,0 +1,61 @@
+name: Request a module or feature
+description: Something you want PlugPHP to do that it doesn't do yet.
+labels: ["module-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you write: a few modules are already planned — media library,
+        newsletter capture, testimonials, form builder, storefront, analytics.
+        If yours is one of them, find the existing issue and add a 👍 instead.
+        Reactions are how the order gets decided.
+
+  - type: input
+    id: name
+    attributes:
+      label: What would you call it?
+      placeholder: Events
+    validations:
+      required: true
+
+  - type: textarea
+    id: does
+    attributes:
+      label: What should it do?
+      description: The pages a visitor would see, and what you'd manage in the admin.
+      placeholder: |
+        Public: a list of upcoming events, and a page per event.
+        Admin: create an event with a date, location, and description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What are you doing instead today?
+      description: >
+        The most useful field here. Hand-coding it each time, using a plugin
+        elsewhere, or going without — it all tells me how much this is worth.
+      placeholder: I rebuild an events table by hand on every client site.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: for
+    attributes:
+      label: What are you building?
+      options:
+        - Client sites
+        - My own site or project
+        - Both
+        - Just looking around
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you want to build it?
+      options:
+        - label: I'd be up for writing this module myself, with some direction.
+          required: false

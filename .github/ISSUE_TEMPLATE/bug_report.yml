@@ -1,0 +1,71 @@
+name: Report a bug
+description: Something in the kit doesn't work the way the docs say it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is for problems with PlugPHP itself. If the trouble is in a site
+        you built with it, the [docs](https://github.com/Bcp-Sambo/plugphp/tree/main/docs)
+        are the faster route.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I opened /install.php and entered my cPanel database details.
+        I expected the connection test to pass.
+        It said "SQLSTATE[HY000] [2002] Connection refused".
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Where does it happen?
+      description: The URL or the file, if you know it.
+      placeholder: /install.php — step 3, database connection
+    validations:
+      required: false
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where are you running it?
+      options:
+        - Shared / cPanel hosting
+        - Local (PHP built-in server)
+        - VPS or my own server
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      description: Run `php -v`, or check cPanel → Select PHP Version.
+      placeholder: "8.2"
+    validations:
+      required: true
+
+  - type: input
+    id: db-version
+    attributes:
+      label: MySQL or MariaDB version
+      placeholder: MariaDB 10.6
+    validations:
+      required: false
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Any error text
+      description: >
+        From the page itself, or storage/logs. Paste it as-is — and delete any
+        passwords, database names, or API keys before you post.
+      render: text
+    validations:
+      required: false
