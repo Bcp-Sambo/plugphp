@@ -19,9 +19,11 @@ meta_description, published_at, created_at, updated_at.
 - Every post view outputs meta title/description/canonical/Open Graph/JSON-LD
   Article schema automatically from the post's own fields — do not hardcode
   these tags per-post.
-- `featured_image` uploads go through the shared upload validator (extension
-  whitelist + MIME sniff + re-encode) — see `contact-form/SKILL.md` for the
-  same pattern if you need to reuse the upload helper.
+- `featured_image` uploads go through `core/Upload.php`:
+  `Upload::image($_FILES['featured_image'], 'blog')`. It sniffs the real MIME
+  type, re-encodes through GD, picks the stored extension itself, and writes a
+  randomly named 0644 file. Never move an uploaded file yourself, and never
+  trust `$_FILES[...]['type']` or the original filename.
 - Slugs must be unique — enforce with a unique index in the migration, not
   application-level checking alone.
 - `body` content from the admin editor must still be escaped or passed

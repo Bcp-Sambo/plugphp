@@ -13,7 +13,7 @@ of the kit. If you just want to get a site running, start with the root
 |---|---|
 | [Getting Started](getting-started.md) | Install paths, first run, project layout, the dev loop |
 | [Architecture](architecture.md) | Request lifecycle, `core/` vs `modules/`, routing, how modules load |
-| [Core API Reference](core-api.md) | Every `core/` class: Config, Database, Auth, View/`e()`, Url, Router, Module, Settings, Mailer, Upload, Updater |
+| [Core API Reference](core-api.md) | Every `core/` class: Config, Database, Auth, View/`e()`, Url, Crypto, Tracking, Branding, Nav, Router, Module, Settings, Mailer, Upload, Updater |
 | [Building a Module](building-a-module.md) | Step-by-step: scaffold → routes → migration → views → admin → `SKILL.md` |
 | [Theming & Branding](theming.md) | `layout.php`, `app.css`, the logo, per-site branding, the admin shell |
 | [Security Model](security.md) | The structural controls: SQL, escaping, CSRF, auth, uploads, `.env`, docroot |

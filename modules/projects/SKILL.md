@@ -17,9 +17,11 @@ completed_at, meta_title, meta_description, created_at, updated_at.
   `json_decode()` on read, encode with `json_encode()` on write. Do not
   create a separate join table unless the client specifically needs
   per-image metadata (captions, ordering) later.
-- All image uploads (featured + gallery) go through the shared upload
-  validator — extension whitelist, MIME sniff, re-encode, stored under
-  `/public/uploads/projects/`, never with executable permissions.
+- All image uploads (featured + gallery) go through `core/Upload.php`:
+  `Upload::image($file, 'projects')` — real MIME sniff, GD re-encode, random
+  filename, stored under `/public/uploads/projects/` at 0644, never
+  executable. Optional third and fourth arguments cap the size and narrow the
+  accepted types: `Upload::image($file, 'projects', 2*1024*1024, ['png'])`.
 - `client_name` is public-facing — confirm with the site owner before
   publishing a project that names a client, this is a business/legal
   question, not a coding one, but worth surfacing if it comes up.

@@ -37,3 +37,18 @@ for it removed.
 - Destructive actions (delete anything) require a confirmation step
   (a confirm dialog or an "are you sure" intermediate page) — do not
   wire a delete button directly to a one-click irreversible action.
+
+## Fixed parts of the dashboard shell
+
+`/admin/settings` and `/admin/updates` are permanent parts of this module,
+the same status as the nav loop itself. A future module must not build a
+second settings area or a second update mechanism.
+
+`/admin/settings` has three tabs — Branding, Email (SMTP), Tracking — each a
+separate POST with its own CSRF token, redirecting back to its own tab.
+Site-wide options belong in one of those tabs. A **module's own** on/off
+visibility toggle still belongs on that module's own admin screen, not here.
+
+Both pages' views live in `views/`, which the auto-updater may never write.
+A release that changes them has to say so in its notes as a manual copy step.
+

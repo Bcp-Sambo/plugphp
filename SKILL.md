@@ -136,6 +136,72 @@ exists at all).
   `Module::publicNavItem()` and `Nav` drops it automatically when the
   toggle is off. See "Public navigation" below.
 
+## File uploads
+
+`core/Upload.php` is the only approved way to accept a file.
+
+```php
+Upload::image($_FILES['featured_image'], 'blog');
+Upload::image($_FILES['site_favicon'], 'branding', 2 * 1024 * 1024, ['png']);
+```
+
+It sniffs the real MIME type with `finfo`, re-encodes the image through GD,
+chooses the stored extension itself, gives the file a random name, and writes
+it 0644 under `public/uploads/<subdir>/`. It returns the stored path for
+saving to the database.
+
+Note the direction of the type check: the optional fourth argument lets a
+caller say which types it will accept, but the decision is still made from the
+file's bytes. **The client's filename never selects the extension.**
+`$_FILES[...]['type']` is client-supplied and trivially forged — never read it.
+
+SVG is not storable at all. It is XML, it can carry `<script>`, and GD cannot
+re-encode it to strip that.
+
+Never move an uploaded file into a public directory yourself.
+
+## Secrets in the database
+
+`core/Crypto.php` is the only approved way to put a secret into the database.
+
+```php
+Settings::set('smtp_pass_encrypted', Crypto::encrypt($password));
+$password = Crypto::decrypt(Settings::get('smtp_pass_encrypted'));
+```
+
+Plain `Settings::set()` is right for anything that is not a secret — a
+measurement ID, a logo path, an on/off flag. A password, token or API key must
+be encrypted, so that a database dump alone does not hand someone working
+credentials. The key lives in `.env` as `APP_KEY` and never in the database.
+
+`decrypt()` returns `null` rather than throwing when the key is missing or the
+value fails its authentication check, so a corrupted row degrades to "not
+configured". Check `Crypto::hasKey()` before saving, and refuse to store the
+secret if it is false — never fall back to storing it in the clear.
+
+## Tracking pixel IDs
+
+Tracking IDs are interpolated **inside an inline `<script>` block**. `e()` does
+not protect that context: it escapes for HTML text, and JavaScript is a
+different grammar. An unvalidated ID would let anyone with dashboard access run
+arbitrary JavaScript on every page for every visitor.
+
+**Validate before saving, not only before rendering.** A value that never
+enters the database cannot be rendered by some future code path that forgets to
+check:
+
+```php
+$id = Tracking::normaliseGaId($_POST['ga_measurement_id']);
+if (Tracking::isValidGaId($id)) { Settings::set('ga_measurement_id', $id); }
+else { /* reject with a clear error */ }
+```
+
+`Tracking::gaId()` and `fbPixelId()` re-check at render as well, so a row
+edited directly in the database is still refused.
+
+Never loosen `Tracking`'s patterns. No legitimate GA or Pixel ID is rejected by
+them. Any inline `<script>` the app emits must carry `View::nonce()`, or the
+content security policy will block it.
 ## Public navigation
 
 The public nav is built from the enabled modules, not written into

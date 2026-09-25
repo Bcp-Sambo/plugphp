@@ -23,10 +23,9 @@ submissions to the database for the admin dashboard.
 - Never build the notification email by concatenating raw `$_POST` values
   into headers — pass values as the message body text only, and always
   through `Mailer::send()`, never raw `mail()`.
-- If this module handles file attachments in the future, route them
-  through the same upload validator pattern described in the Projects
-  module's SKILL.md (extension whitelist + MIME sniff + re-encode) —
-  do not accept arbitrary file types.
+- If this module handles file attachments in the future, route them through
+  `core/Upload.php` (`Upload::image($file, 'contact')`). It only ever stores
+  images; do not add a path that accepts arbitrary file types.
 
 ## Dashboard nav
 Optionally registers "Messages" in the admin sidebar, listing submissions

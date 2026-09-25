@@ -195,6 +195,80 @@ attached. `APP_URL` must therefore be the site's full public root, including
 the subfolder if there is one — the detected base is not appended on top.
 
 ---
+## Crypto
+
+The only approved way to store a secret in the database. See "Secrets in the
+database" in the root `SKILL.md`.
+
+```php
+Crypto::hasKey();                 // is an APP_KEY available?
+Crypto::encrypt($plaintext);      // base64(iv . tag . ciphertext)
+Crypto::decrypt($stored);         // null on missing key / tampering / garbage
+Crypto::ensureKey();              // generate and write APP_KEY to .env
+Crypto::suggestedKeyLine();       // the line to paste when .env is read-only
+```
+
+AES-256-GCM. GCM rather than CBC because it is authenticated: a value altered
+in the database fails its tag check and `decrypt()` returns `null`, so a
+tampered row degrades to "not configured" instead of feeding a caller
+corrupted bytes. Unauthenticated CBC would let anyone who can write to
+`site_settings` change ciphertext undetectably.
+
+`encrypt()` throws when there is no key, rather than letting a caller silently
+store a secret in the clear. `decrypt()` never throws.
+
+`APP_KEY` lives in `.env`, never in the database — a leak of one must not be a
+leak of both. It is generated per install. Because `.env` is on the updater's
+never-touch list, no release can add it to an existing site, so `ensureKey()`
+creates one on first need; when `.env` is not writable it returns `false` and
+the caller must refuse to store the secret.
+
+Changing `APP_KEY` makes existing encrypted values unreadable.
+
+---
+
+## Tracking
+
+GA4 and Facebook Pixel snippets, driven by dashboard settings.
+
+```php
+Tracking::isValidGaId($id);        // ^G-[A-Z0-9]{4,24}$
+Tracking::isValidFbPixelId($id);   // ^[0-9]{5,24}$
+Tracking::normaliseGaId($input);   // trim + uppercase, then validate
+Tracking::headSnippet();           // GA4 gtag.js, for <head>
+Tracking::bodySnippet();           // FB Pixel, for just after <body>
+Tracking::isActive();              // enabled AND at least one valid ID
+Tracking::cspScriptSources();      // vendor hosts to allow right now
+Tracking::cspConnectSources();
+```
+
+The IDs land inside inline `<script>` blocks, so they are validated before
+saving and again before rendering — see "Tracking pixel IDs" in the root
+`SKILL.md`. Both snippets return an empty string unless tracking is enabled
+and the relevant ID is valid.
+
+The CSP host lists live here, next to the snippets, so a snippet that gains a
+dependency and the policy that permits it cannot drift apart.
+
+---
+
+## Branding
+
+Site identity from the dashboard, with fallbacks.
+
+```php
+Branding::siteName();          // falls back to APP_NAME
+Branding::description();       // '' when unset
+Branding::logo();              // falls back to the shipped asset
+Branding::favicon();           // null when unset
+Branding::ogImage();
+Branding::ogImageAbsolute();   // via Url::absolute(), for Open Graph
+```
+
+Every accessor is safe while the database is unreachable, because the layout
+calls them on every page including the 404. Render image paths with `asset()`.
+
+---
 ## Nav
 
 Builds the public site navigation from the enabled modules, dropping any the
@@ -346,6 +420,11 @@ rollback button is offered for 7 days.
 
 ---
 ## Upload
+
+> Signature note: `Upload::image($file, $subdir, ?int $maxBytes = null, ?array $onlyTypes = null)`.
+> The last two are optional — `Upload::image($f, 'branding', 2*1024*1024, ['png'])` caps the size
+> and accepts PNG only. The type list says what the caller will accept; the decision is still made
+> from the file's sniffed bytes, and the stored extension is always chosen by the server.
 
 `core/Upload.php` — the shared, secure image-upload validator. Route **all**
 image uploads through it; never move an uploaded file yourself.
