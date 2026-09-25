@@ -120,6 +120,11 @@ final class Mailer
             $mail->Username   = $cfg['user'];
             $mail->Password   = $cfg['pass'];
             $mail->SMTPSecure = $cfg['encryption'];
+            // PHPMailer defaults to 300s. A wrong host or a port the server
+            // blocks would leave the admin watching a spinner for five minutes
+            // after clicking Test; 15s is long enough for a real relay and
+            // short enough to be a usable answer.
+            $mail->Timeout = 15;
 
             $mail->setFrom($cfg['from_email'], $cfg['from_name']);
             $mail->addAddress($toEmail);

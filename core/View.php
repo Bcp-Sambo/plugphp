@@ -73,15 +73,21 @@ final class View
      */
     private static function contentSecurityPolicy(): string
     {
-        $script  = ["'self'"];
+        // The nonce is always present. It costs nothing when no inline script
+        // is emitted, and it means the app can use an inline <script> anywhere
+        // — the admin settings page does — without ever needing
+        // 'unsafe-inline'. A per-request random value is no use to an attacker
+        // who cannot read the response that carried it.
+        $script  = ["'self'", "'nonce-" . self::nonce() . "'"];
         $connect = ["'self'"];
 
+        // Third-party hosts are the part that stays conditional: they are only
+        // allowed while tracking is actually on and configured.
         // class_exists guards the standalone entry points (install.php,
         // health.php) that load only part of core.
         if (class_exists('Tracking') && Tracking::isActive()) {
-            $script[] = "'nonce-" . self::nonce() . "'";
-            $script   = array_merge($script, Tracking::cspScriptSources());
-            $connect  = array_merge($connect, Tracking::cspConnectSources());
+            $script  = array_merge($script, Tracking::cspScriptSources());
+            $connect = array_merge($connect, Tracking::cspConnectSources());
         }
 
         return implode('; ', [

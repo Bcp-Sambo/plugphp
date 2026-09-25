@@ -50,3 +50,39 @@ $router->post('/admin/updates/finish', function (): void {
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::updatesPage(Updater::finishInterrupted());
 });
+
+/* ------------------------------------------------------------------ *
+ * Site settings — branding, SMTP, tracking.
+ *
+ * A fixed part of the dashboard shell. Every write is POST + login + CSRF;
+ * the page itself is the only GET.
+ * ------------------------------------------------------------------ */
+
+$router->get('/admin/settings', function (): void {
+    Auth::requireLogin();
+    AdminDashboardModule::settingsPage();
+});
+
+$router->post('/admin/settings/branding', function (): void {
+    Auth::requireLogin();
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::saveBranding();
+});
+
+$router->post('/admin/settings/smtp', function (): void {
+    Auth::requireLogin();
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::saveSmtp();
+});
+
+$router->post('/admin/settings/test-email', function (): void {
+    Auth::requireLogin();
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::sendTestEmail();
+});
+
+$router->post('/admin/settings/tracking', function (): void {
+    Auth::requireLogin();
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::saveTracking();
+});
