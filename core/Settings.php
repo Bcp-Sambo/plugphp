@@ -55,6 +55,17 @@ final class Settings
         }
     }
 
+    /**
+     * Remove a setting entirely.
+     *
+     * Distinct from set($key, ''): an empty string is a stored value, so the
+     * row stays behind and get()'s $default can never be returned for it
+     * again. Use this when a setting should go back to not existing.
+     */
+    public static function delete(string $key): void
+    {
+        Database::delete('site_settings', 'setting_key', $key);
+    }
     /** Convenience helper for the common "is this module's public side visible" check. */
     public static function isModuleVisible(string $moduleName): bool
     {

@@ -26,7 +26,7 @@ final class Updater
      * package (it lives in core/, which is overwritable), so it updates itself
      * when a package is applied.
      */
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     /**
      * Where the update feed lives. HARDCODED ON PURPOSE — never read from
@@ -481,7 +481,7 @@ final class Updater
         }
 
         // Clear the rollback marker: the backup has been consumed.
-        Settings::set(self::KEY_ROLLBACK, '');
+        Settings::delete(self::KEY_ROLLBACK);
 
         // The database schema is NOT rolled back. Migrations are forward-only,
         // and dropping columns to match older code would destroy data.

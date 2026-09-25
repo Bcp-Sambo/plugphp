@@ -242,6 +242,7 @@ Settings::get('some_key', $default);
 Settings::getBool('blog_visible', true);
 Settings::set('blog_visible', '1');
 Settings::isModuleVisible('blog');    // getBool("{module}_visible", true)
+Settings::delete('some_key');       // remove the row entirely; not the same as set('')
 ```
 
 Use this for any dashboard-controlled on/off setting. **Do not** create a
