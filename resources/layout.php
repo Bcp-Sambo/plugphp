@@ -8,10 +8,17 @@
  * $content is provided by View::render(). $pageTitle / $metaDescription /
  * $headExtra are optional and set by the view (or the module) beforehand.
  */
-$pageTitle = $pageTitle ?? Config::get('APP_NAME', 'Site');
-$metaDescription = $metaDescription ?? '';
+$brandName = Branding::siteName();
+$pageTitle = $pageTitle ?? $brandName;
+// A view that set its own description wins; the site-wide one from the
+// dashboard is the fallback for pages that did not set one.
+$metaDescription = $metaDescription ?? Branding::description();
 $headExtra = $headExtra ?? '';
-$brandName = Config::get('APP_NAME', 'PlugPHP');
+$siteLogo = Branding::logo();
+$favicon = Branding::favicon();
+// Modules emit their own og:image for a post's featured image. Only fall
+// back to the site default when the page did not provide one.
+$fallbackOgImage = str_contains($headExtra, 'og:image') ? null : Branding::ogImageAbsolute();
 // A view may set $bareLayout = true to render without the public header/footer
 // (used for the centered auth screens). The view then owns the full chrome.
 $bareLayout = $bareLayout ?? false;
@@ -34,6 +41,12 @@ $primaryItem = Nav::primaryItem();
     <meta name="description" content="<?= e($metaDescription) ?>">
     <?php endif; ?>
     <?= $headExtra /* canonical / Open Graph / JSON-LD, pre-escaped by the module */ ?>
+    <?php if ($fallbackOgImage !== null): ?>
+    <meta property="og:image" content="<?= e($fallbackOgImage) ?>">
+    <?php endif; ?>
+    <?php if ($favicon !== null): ?>
+    <link rel="icon" href="<?= asset($favicon) ?>">
+    <?php endif; ?>
     <?= Tracking::headSnippet() /* GA4; empty unless enabled + a valid ID is saved */ ?>
     <link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
 </head>
@@ -49,7 +62,7 @@ $primaryItem = Nav::primaryItem();
         <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1">
         <div class="container site-header__bar">
             <a class="brand" href="<?= url('/') ?>">
-                <img class="brand__mark" src="<?= asset('/assets/img/logo.png') ?>" alt="" width="30" height="30">
+                <img class="brand__mark" src="<?= asset($siteLogo) ?>" alt="" width="30" height="30">
                 <span><?= e($brandName) ?></span>
             </a>
             <nav class="nav" aria-label="Primary">
@@ -76,7 +89,7 @@ $primaryItem = Nav::primaryItem();
         <div class="container site-footer__grid">
             <div>
                 <div class="site-footer__brand">
-                    <img class="brand__mark" src="<?= asset('/assets/img/logo.png') ?>" alt="" width="26" height="26">
+                    <img class="brand__mark" src="<?= asset($siteLogo) ?>" alt="" width="26" height="26">
                     <span><?= e($brandName) ?></span>
                 </div>
                 <p>A modular, agent-ready PHP starter kit for shared hosting — secure and SEO-ready by default.</p>

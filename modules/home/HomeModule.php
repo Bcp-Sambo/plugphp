@@ -50,7 +50,7 @@ final class HomeModule extends Module
             ['now' => date('Y-m-d H:i:s')]
         );
 
-        $appName = (string) Config::get('APP_NAME', 'Home');
+        $appName = Branding::siteName();
 
         View::render(__DIR__ . '/views/home.php', array_merge($this->seoHead(), [
             'services' => $services,
@@ -81,10 +81,14 @@ final class HomeModule extends Module
     /** @return array{pageTitle:string, metaDescription:string, headExtra:string} */
     private function seoHead(): array
     {
-        $appName = (string) Config::get('APP_NAME', 'Home');
+        $appName = Branding::siteName();
         // Built from APP_URL via Url::absolute(), never from the request host.
         $homeUrl = Url::absolute('/');
-        $desc = 'Welcome to ' . $appName . '.';
+        // The owner's own site description wins; the generic sentence is only
+        // the fallback for a site that has not set one.
+        $desc = Branding::description() !== ''
+            ? Branding::description()
+            : 'Welcome to ' . $appName . '.';
 
         $ld = array(
             '@context' => 'https://schema.org',

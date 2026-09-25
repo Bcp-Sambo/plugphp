@@ -108,8 +108,8 @@ final class BlogModule extends Module
             'headline'         => $post['title'],
             'description'      => $desc,
             'mainEntityOfPage' => $this->canonical('/blog/' . $post['slug']),
-            'author'           => ['@type' => 'Organization', 'name' => (string) Config::get('APP_NAME', '')],
-            'publisher'        => ['@type' => 'Organization', 'name' => (string) Config::get('APP_NAME', '')],
+            'author'           => ['@type' => 'Organization', 'name' => Branding::siteName()],
+            'publisher'        => ['@type' => 'Organization', 'name' => Branding::siteName()],
         ];
         if (!empty($post['published_at'])) {
             $ld['datePublished'] = date('c', strtotime((string) $post['published_at']));
@@ -409,7 +409,7 @@ final class BlogModule extends Module
         array $jsonLd
     ): array {
         $canonical = $this->canonical($canonicalPath);
-        $siteName = (string) Config::get('APP_NAME', '');
+        $siteName = Branding::siteName();
 
         $head  = '<link rel="canonical" href="' . e($canonical) . '">' . "\n";
         $head .= '<meta property="og:type" content="' . e($ogType) . '">' . "\n";

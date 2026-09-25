@@ -10,7 +10,7 @@ $valid = $valid ?? false;
 $error = $error ?? null;
 $pageTitle = 'Set a new password';
 $bareLayout = true;
-$brandName = Config::get('APP_NAME', 'PlugPHP');
+$brandName = Branding::siteName();
 $mark = '<img class="brand__mark" src="' . asset('/assets/img/logo.png') . '" alt="" width="34" height="34">';
 ?>
 <div class="auth">

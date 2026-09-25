@@ -13,7 +13,7 @@
  */
 $pageTitle = $pageTitle ?? 'Admin';
 $navItems = $navItems ?? [];
-$brandName = Config::get('APP_NAME', 'PlugPHP');
+$brandName = Branding::siteName();
 // Compare against the route path, not the raw request path: under a
 // subfolder mount REQUEST_URI carries the mount prefix ('/site/admin/blog')
 // while nav items are registered route paths ('/admin/blog'), so without

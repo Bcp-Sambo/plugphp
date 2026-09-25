@@ -90,7 +90,7 @@ final class ServicesModule extends Module
                 'url'         => $this->canonical('/services/' . $service['slug']),
                 'provider'    => [
                     '@type' => 'Organization',
-                    'name'  => (string) Config::get('APP_NAME', ''),
+                    'name'  => Branding::siteName(),
                 ],
             ]
         );
@@ -320,7 +320,7 @@ final class ServicesModule extends Module
         array $jsonLd
     ): array {
         $canonical = $this->canonical($canonicalPath);
-        $siteName = (string) Config::get('APP_NAME', '');
+        $siteName = Branding::siteName();
 
         $head  = '<link rel="canonical" href="' . e($canonical) . '">' . "\n";
         $head .= '<meta property="og:type" content="' . e($ogType) . '">' . "\n";

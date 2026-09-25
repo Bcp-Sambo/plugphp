@@ -446,7 +446,7 @@ final class ProjectsModule extends Module
         array $jsonLd
     ): array {
         $canonical = $this->canonical($canonicalPath);
-        $siteName = (string) Config::get('APP_NAME', '');
+        $siteName = Branding::siteName();
 
         $head  = '<link rel="canonical" href="' . e($canonical) . '">' . "\n";
         $head .= '<meta property="og:type" content="' . e($ogType) . '">' . "\n";

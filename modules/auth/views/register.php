@@ -9,7 +9,7 @@ $error = $error ?? null;
 $old = $old ?? [];
 $pageTitle = 'Create an account';
 $bareLayout = true;
-$brandName = Config::get('APP_NAME', 'PlugPHP');
+$brandName = Branding::siteName();
 $mark = '<img class="brand__mark" src="' . asset('/assets/img/logo.png') . '" alt="" width="34" height="34">';
 ?>
 <div class="auth">
