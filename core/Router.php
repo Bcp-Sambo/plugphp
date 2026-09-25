@@ -28,7 +28,17 @@ final class Router
 
     public function dispatch(string $method, string $uri): void
     {
-        $path = parse_url($uri, PHP_URL_PATH);
+        $path = (string) parse_url($uri, PHP_URL_PATH);
+
+        // Strip the mount prefix before matching. Routes are registered as
+        // '/blog', but under a subfolder mount the browser sends
+        // '/site/blog'. This is the incoming-side counterpart to Url::to()
+        // on the outgoing side, and keeps every registered route literal.
+        $base = Url::base();
+        if ($base !== '' && str_starts_with($path, $base)) {
+            $path = substr($path, strlen($base));
+        }
+
         $path = rtrim($path, '/') ?: '/';
 
         $methodRoutes = $this->routes[$method] ?? [];

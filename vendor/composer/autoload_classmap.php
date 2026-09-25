@@ -21,6 +21,8 @@ return array(
     'PHPMailer\\PHPMailer\\SMTP' => $vendorDir . '/phpmailer/phpmailer/src/SMTP.php',
     'Router' => $baseDir . '/core/Router.php',
     'Settings' => $baseDir . '/core/Settings.php',
+    'Updater' => $baseDir . '/core/Updater.php',
     'Upload' => $baseDir . '/core/Upload.php',
+    'Url' => $baseDir . '/core/Url.php',
     'View' => $baseDir . '/core/View.php',
 );

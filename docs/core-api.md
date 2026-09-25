@@ -151,6 +151,50 @@ in.
 
 ---
 
+## Url
+
+Makes the app indifferent to where it is mounted — domain root, subdomain, or
+subfolder. Every internal link, asset, redirect and canonical URL goes through
+here. See hard rule 6 in the root `SKILL.md`.
+
+```php
+// In views — HTML-escaped, drop straight into an attribute.
+<a href="<?= url('/blog') ?>">Blog</a>
+<link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
+<img src="<?= asset($post['featured_image']) ?>" alt="">
+
+// In PHP — raw strings.
+header('Location: ' . Url::to('/admin/blog'));
+$canonical = Url::absolute('/blog/' . $post['slug']);
+```
+
+| Method | Returns | Use for |
+|---|---|---|
+| `Url::base()` | `''` or `/prefix` | The detected mount prefix. Rarely needed directly. |
+| `Url::to($path)` | raw | Internal links, form actions, redirects. |
+| `Url::asset($path)` | raw | Static assets and uploaded files. |
+| `Url::absolute($path)` | raw | Canonical, Open Graph, sitemap, email links. |
+| `url($path)` | escaped | View helper wrapping `Url::to()`. |
+| `asset($path)` | escaped | View helper wrapping `Url::asset()`. |
+
+`url()` and `asset()` already apply `e()`. Do not wrap them in `e()` again.
+
+**Base-path detection.** The prefix is derived by comparing the front
+controller's location (`SCRIPT_NAME`) against the path the browser actually
+requested. A prefix only counts when the request genuinely carries it — which
+is what makes the root-`.htaccess` fallback work. Under that fallback
+`SCRIPT_NAME` is `/public/index.php` while the browser asked for `/blog`;
+naively taking `dirname()` would emit `/public/blog` links, and that same
+`.htaccess` refuses to rewrite them, so every link would 404.
+
+**`Url::absolute()` and the Host header.** The host always comes from
+`APP_URL`, never from `$_SERVER['HTTP_HOST']`. `HTTP_HOST` is
+attacker-controllable: a password-reset link built from it lets an attacker
+mail a victim a reset URL pointing at a host they control, with a valid token
+attached. `APP_URL` must therefore be the site's full public root, including
+the subfolder if there is one — the detected base is not appended on top.
+
+---
 ## Router
 
 `core/Router.php` — the route table. You don't instantiate it; the front
@@ -222,6 +266,59 @@ calls simply fail-soft (log + `false`), so contact/reset features no-op cleanly.
 
 ---
 
+## Updater
+
+Powers the one-click update at **admin → Updates**. Triggered only from an
+authenticated, CSRF-guarded POST — there is no cron entry point and nothing is
+ever applied automatically.
+
+```php
+Updater::VERSION;              // version of the files on disk (a constant)
+Updater::installedVersion();   // version recorded in site_settings
+Updater::versionsAgree();      // false when an update stopped partway
+
+$manifest = Updater::fetchManifest();       // null when unreachable
+Updater::isNewer($manifest);
+Updater::preflight();                       // PASS/WARN/FAIL readiness checks
+Updater::update();                          // ['success'=>bool,'log'=>string[],'version'=>?string]
+Updater::rollbackAvailable();
+Updater::rollback();
+Updater::finishInterrupted();               // run outstanding migrations only
+```
+
+**The boundary.** `Updater::isSafePath()` is the allowlist, and it is the whole
+safety guarantee of the feature — see "Auto-update boundaries" in the root
+`SKILL.md`. A package containing any path outside it is rejected whole rather
+than partially applied. `tools/build-release.php` checks the same list when
+packaging, so a mistake fails at release time, not on every site.
+
+**The flow**, each step logged and shown to the admin: fetch the manifest →
+preflight → download → verify SHA-256 → validate every path in the package →
+back up the files about to change → apply → run new migrations → record the
+version. A checksum mismatch aborts unconditionally and deletes the download.
+A write failure partway through triggers an automatic restore.
+
+**Why two version values.** `VERSION` is a compile-time constant shipped inside
+each package, so it describes the files on disk. The `site_settings` row
+describes what the *database* has been migrated to. Keeping them separate makes
+a half-finished update detectable instead of silently wrong; `versionsAgree()`
+is that check, and `finishInterrupted()` is the recovery.
+
+**Applying does not reload the constant.** After `apply()` overwrites
+`core/Updater.php`, `self::VERSION` in the running process is still the old
+value — PHP compiled the class at include time. A per-request guard stops a
+double-submit from applying twice and destroying the one good rollback point.
+The next request reads the new constant normally.
+
+**Rollback is code-only.** It restores files from the pre-update backup and
+deletes files the update introduced, but never reverses a migration: schema
+changes are forward-only, and undoing an `ALTER TABLE` would destroy data.
+Write migrations so older code tolerates the newer schema.
+
+Backups live in `storage/backups/`, capped at the 3 most recent, and the
+rollback button is offered for 7 days.
+
+---
 ## Upload
 
 `core/Upload.php` — the shared, secure image-upload validator. Route **all**

@@ -132,6 +132,10 @@ Whether written by the installer or by hand, confirm `.env` has:
 - [ ] `APP_DEBUG=false`  ← errors are logged to `storage/logs/`, never shown
 - [ ] `APP_URL=https://your-domain`  ← drives canonical / Open Graph URLs; must
       be the real domain, or those tags leak the wrong host
+- [ ] `FORCE_HSTS=false` until SSL is confirmed working on this exact domain,
+      then `true`. Turning it on before the certificate is issued makes the
+      site unreachable over HTTP with no visible error — the usual way a fresh
+      subdomain bricks itself
 - [ ] `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASS` — the host's database
 - [ ] `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_ENCRYPTION`
       / `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` — required for the contact form
@@ -145,6 +149,69 @@ Whether written by the installer or by hand, confirm `.env` has:
 
 ---
 
+## 4d. Deploying to a subdomain or a subfolder
+
+A main-domain deploy and a subdomain deploy are **different mount locations**,
+and cPanel treats them differently. This section exists because a real
+subdomain deploy once cost two hours of debugging that all traced back to the
+same root cause.
+
+**Run `health.php` first.** Upload the project, then open
+`https://your-domain/health.php` before anything else. It checks the nine
+things that actually go wrong, in plain language, and tells you which one is
+blocking you. Delete it once the site is live.
+
+### Document root — the one that matters
+
+On a main domain you drop the contents of `public/` into `public_html/` and it
+works by habit. On a **subdomain**, cPanel creates a separate document root
+(e.g. `public_html/index/`), and it is very easy to leave that pointing at the
+project root instead of `plugphp/public/`.
+
+When that happens the server tries to serve the project root, where there is
+no `index.php`. You get a directory listing or a 404 — and, worse, `core/` and
+`.env` become reachable over the web.
+
+- **Preferred:** cPanel → *Domains* → set the subdomain's document root to the
+  `public/` folder. `health.php`'s "Document root" check confirms it.
+- **Fallback:** if your host will not let you repoint it, the project-root
+  `.htaccess` shipped with PlugPHP forwards traffic into `public/` and returns
+  403 for `core/`, `config/`, `storage/`, `modules/`, `resources/`, `vendor/`
+  and `.env`. This is safe, but it is the second choice — verify each of those
+  paths returns 403 before going live.
+
+> If the document root was ever pointing at the project root on a live,
+> internet-reachable domain, treat `.env` as compromised: rotate the database
+> password and any SMTP credentials after fixing it.
+
+### Subfolders work without code changes
+
+PlugPHP detects the URL prefix it is served under and applies it to every
+internal link, asset and redirect automatically. A site at
+`example.com/mysite/` needs no code edits. `health.php`'s "Detected base path"
+check shows what it detected.
+
+Set `APP_URL` to the site's **full public root including the subfolder**
+(`https://example.com/mysite`) — `APP_URL` is what canonical tags, Open Graph
+tags, sitemap entries and password-reset links are built from.
+
+### The quieter subdomain traps
+
+- **PHP version.** cPanel MultiPHP can give a subdomain a different PHP version
+  than the main domain. Code that runs fine on the main site can fail here for
+  reasons unrelated to the deploy. `health.php` reports the version this
+  domain actually runs.
+- **SSL not issued yet.** A fresh subdomain often has no certificate for its
+  first minutes or hours. Leave `FORCE_HSTS=false` until `https://` is
+  confirmed working on that exact domain — sending HSTS before the certificate
+  exists tells the browser to refuse plain HTTP, and the site becomes
+  unreachable with no visible error.
+- **`APP_URL` copied from the last deploy.** If `.env` still names the previous
+  host, canonical tags, Open Graph tags, sitemap URLs and password-reset links
+  all point at the wrong domain. `install.php` now pre-fills `APP_URL` from the
+  address you open it on; `health.php` warns if it stops matching.
+
+---
 ## 5. Verify (do not skip)
 
 - [ ] **HTTPS is active.** Enable cPanel *AutoSSL* first. Admin login will NOT
@@ -169,12 +236,72 @@ Whether written by the installer or by hand, confirm `.env` has:
       - `https://your-domain/.env`
       - `https://your-domain/storage/logs/php-error.log`
       - `https://your-domain/config/modules.php`
+- [ ] **`health.php` reports no FAIL.** Open `https://your-domain/health.php`
+      and resolve every FAIL before going live (WARNs on HTTPS and `APP_URL`
+      are expected to clear once SSL is issued and `APP_URL` is correct).
+- [ ] **Links work from the real mount point.** If this is a subdomain or a
+      subfolder, click through the nav, open a content detail page, and log in
+      — assets, links and post-login redirects must all stay under the right
+      prefix. See §4d.
+- [ ] **`FORCE_HSTS` turned on only after SSL is confirmed.** Set it to `true`
+      in `.env` once `https://` is verified working on this exact domain, not
+      before.
 - [ ] `install.php` is deleted (`https://your-domain/install.php` → 404).
+- [ ] `health.php` is deleted (`https://your-domain/health.php` → 404).
 - [ ] Send a test message through `/contact` (once SMTP is set) and confirm the
       notification email arrives and the row appears under admin → Messages.
 
 ---
 
+## 5b. Keeping the site updated
+
+Once live, PlugPHP can update itself from **admin → Updates**. Nothing is ever
+applied automatically: there is no cron entry point, and every update is an
+explicit click.
+
+**What an update changes.** PlugPHP's own code only — `core/`, each module's
+logic and routes, new migrations, and `public/index.php`. It never touches your
+page designs (`resources/` and each module's `views/`), your `.env`, your
+enabled-module list, or your `.htaccess` files. A package containing anything
+outside that set is rejected whole rather than partially applied.
+
+**What happens when you click Update.**
+
+1. Checks this host can take an update — writable files, the `zip` extension,
+   a way to download, free disk space. If any check fails nothing is
+   downloaded.
+2. Downloads the package and verifies it against the SHA-256 the update server
+   published. A mismatch aborts unconditionally and deletes the download; no
+   retry bypasses it.
+3. Confirms every path in the package is one an update may modify.
+4. Backs up the current version of each file about to change.
+5. Applies the files, then runs any new migrations.
+
+If a file cannot be written partway through, the update stops and restores the
+backup automatically.
+
+**Rolling back.** For 7 days after an update a Roll back button restores the
+previous code files. Database changes are *not* reversed — migrations only move
+forward, and undoing them would destroy data. New columns simply go unused.
+
+**Two things the updater cannot do for you**, both of which appear in a
+release's notes when they apply:
+
+- **Change a view or `resources/layout.php`.** Those are your design work, so
+  an update will never overwrite them. If a release improves a shipped view,
+  the notes describe the change for you to apply by hand.
+- **Update `vendor/`.** Dependency fixes — a PHPMailer security release, say —
+  need a full manual redownload of the kit.
+
+**If the panel reports a version mismatch**, an update applied its files but
+did not finish its database changes. The Finish the interrupted update button
+runs only the outstanding migrations; it downloads nothing.
+
+**Backups** live in `storage/backups/`, capped at the 3 most recent. They are
+not a substitute for your host's backups — take a full backup before a major
+update.
+
+---
 ## 6. Performance (optional, from the PRD)
 
 - [ ] Put the site behind Cloudflare's free tier (CDN + caching) once it's live.

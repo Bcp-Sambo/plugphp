@@ -1,16 +1,43 @@
-# PlugPHP — project-root .htaccess (defense in depth).
+# PlugPHP — project-root .htaccess
 #
-# The CORRECT deployment points the domain's document root at the public/
-# subdirectory (see docs/DEPLOY.md), which keeps this file, .env, core/,
-# config/ and storage/ entirely outside the web root.
+# PREFERRED DEPLOYMENT: point the domain's document root at the public/
+# subdirectory (see docs/DEPLOY.md). That keeps this file, .env, core/,
+# config/, storage/ and vendor/ entirely outside the web root, and nothing
+# below is needed.
 #
-# This file only does anything if the document root was mistakenly set to
-# the project root instead of public/. In that case it blocks direct access
-# to the sensitive files that would otherwise be exposed.
+# FALLBACK: some hosts will not let you repoint a subdomain's document root.
+# In that case the docroot lands on the project root and everything here is
+# web-reachable. This file then does two jobs:
+#   1. hard-block the paths that must never be served, and
+#   2. forward everything else into public/ so the app still works.
+#
+# Both modes are safe to ship; in the preferred layout this file is inert.
 
 Options -Indexes
 
-# Block the environment file and any other dotfile outright.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1. Refuse anything outside public/ that could leak source or secrets.
+    #    [F] returns 403 and [L] stops processing, so these never reach the
+    #    forwarding rule below.
+    RewriteRule ^(core|config|storage|modules|resources|vendor|docs)/ - [F,L]
+    RewriteRule ^(\.env|composer\.(json|lock)) - [F,L]
+
+    # 2. Forward the rest into public/.
+    #
+    #    The match is on the RULE PATTERN (directory-relative), deliberately
+    #    NOT on %{REQUEST_URI}. REQUEST_URI is absolute from the domain root,
+    #    so a condition like "!^/public/" is only correct when the project
+    #    sits at the domain root — install it in a subfolder and the already
+    #    rewritten path never matches, so the rule fires forever and Apache
+    #    returns a 500 rewrite loop. A directory-relative pattern is correct
+    #    at any depth.
+    RewriteRule ^public/ - [L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Never serve dotfiles, whatever the docroot points at.
 <FilesMatch "^\.">
     <IfModule mod_authz_core.c>
         Require all denied
@@ -21,7 +48,8 @@ Options -Indexes
     </IfModule>
 </FilesMatch>
 
-# Belt and braces: explicitly block the env files by name too.
+# Belt and braces: block the env files by name too, in case a host's
+# configuration does not apply the dotfile rule above.
 <FilesMatch "^(\.env|\.env\.example)$">
     <IfModule mod_authz_core.c>
         Require all denied

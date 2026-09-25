@@ -82,21 +82,22 @@ final class HomeModule extends Module
     private function seoHead(): array
     {
         $appName = (string) Config::get('APP_NAME', 'Home');
-        $appUrl = rtrim((string) Config::get('APP_URL', ''), '/');
+        // Built from APP_URL via Url::absolute(), never from the request host.
+        $homeUrl = Url::absolute('/');
         $desc = 'Welcome to ' . $appName . '.';
 
         $ld = array(
             '@context' => 'https://schema.org',
             '@type'    => 'Organization',
             'name'     => $appName,
-            'url'      => $appUrl !== '' ? $appUrl . '/' : '',
+            'url'     => $homeUrl,
         );
 
-        $head  = '<link rel="canonical" href="' . e($appUrl . '/') . '">' . "\n";
+        $head  = '<link rel="canonical" href="' . e($homeUrl) . '">' . "\n";
         $head .= '<meta property="og:type" content="website">' . "\n";
         $head .= '<meta property="og:title" content="' . e($appName) . '">' . "\n";
         $head .= '<meta property="og:description" content="' . e($desc) . '">' . "\n";
-        $head .= '<meta property="og:url" content="' . e($appUrl . '/') . '">' . "\n";
+        $head .= '<meta property="og:url" content="' . e($homeUrl) . '">' . "\n";
         $head .= '<meta property="og:site_name" content="' . e($appName) . '">' . "\n";
         $head .= '<script type="application/ld+json">'
                . json_encode($ld, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)

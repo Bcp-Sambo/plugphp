@@ -1,19 +1,19 @@
 <?php return array(
     'root' => array(
         'name' => 'kabirusambo/plugphp',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '60a1546055397d641c2ac63afb507799f780e206',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'dev' => false,
+        'dev' => true,
     ),
     'versions' => array(
         'kabirusambo/plugphp' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '60a1546055397d641c2ac63afb507799f780e206',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

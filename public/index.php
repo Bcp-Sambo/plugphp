@@ -13,9 +13,11 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Mailer.php';
 require_once __DIR__ . '/../core/View.php';
+require_once __DIR__ . '/../core/Url.php';   // after View.php: url()/asset() build on e()
 require_once __DIR__ . '/../core/Router.php';
 require_once __DIR__ . '/../core/Module.php';
 require_once __DIR__ . '/../core/Settings.php';
+require_once __DIR__ . '/../core/Updater.php';
 
 Config::load(__DIR__ . '/../.env');
 

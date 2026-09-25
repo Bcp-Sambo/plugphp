@@ -8,7 +8,7 @@
 ?>
 <article>
     <div class="container" style="max-width:680px;padding-top:clamp(40px,5vw,64px)">
-        <a class="backlink" href="/blog">&larr; All posts</a>
+        <a class="backlink" href="<?= url('/blog') ?>">&larr; All posts</a>
         <?php if (!empty($post['published_at'])): ?>
             <time datetime="<?= e(date('c', strtotime((string) $post['published_at']))) ?>" style="display:block;font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-top:24px"><?= e(date('F j, Y', strtotime((string) $post['published_at']))) ?></time>
         <?php endif; ?>
@@ -18,7 +18,7 @@
     <div class="container" style="max-width:900px;margin-top:28px">
         <div class="ratio ratio-16x9">
             <?php if (!empty($post['featured_image'])): ?>
-                <img src="<?= e($post['featured_image']) ?>" alt="<?= e($post['title']) ?>" loading="lazy">
+                <img src="<?= asset($post['featured_image']) ?>" alt="<?= e($post['title']) ?>" loading="lazy">
             <?php else: ?>
                 <span class="img-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Featured · 16:9</span></span>
             <?php endif; ?>

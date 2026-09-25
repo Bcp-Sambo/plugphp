@@ -10,9 +10,9 @@
         <h1>Delete this service?</h1>
     </div>
     <p>You're about to permanently delete “<strong><?= e($service['title']) ?></strong>”. This can't be undone.</p>
-    <form method="post" action="/admin/services/<?= e((string) $service['id']) ?>/delete" class="confirm__actions">
+    <form method="post" action="<?= url('/admin/services/' . (string) $service['id'] . '/delete') ?>" class="confirm__actions">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-        <a class="btn btn-secondary" href="/admin/services">Cancel</a>
+        <a class="btn btn-secondary" href="<?= url('/admin/services') ?>">Cancel</a>
         <button class="btn btn-danger" type="submit">Yes, delete</button>
     </form>
 </div>

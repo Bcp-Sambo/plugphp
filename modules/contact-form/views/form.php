@@ -26,11 +26,11 @@ $errIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
                     <div>
                         <span class="alert__title alert__title--block">Thanks — your message has been sent.</span>
                         <p style="font-size:14.5px;color:var(--body);margin-top:6px">We usually reply within one business day.</p>
-                        <a class="textlink" href="/contact" style="display:inline-block;margin-top:12px">Send another &rarr;</a>
+                        <a class="textlink" href="<?= url('/contact') ?>" style="display:inline-block;margin-top:12px">Send another &rarr;</a>
                     </div>
                 </div>
             <?php else: ?>
-                <form method="post" action="/contact" novalidate style="display:flex;flex-direction:column;gap:18px">
+                <form method="post" action="<?= url('/contact') ?>" novalidate style="display:flex;flex-direction:column;gap:18px">
                     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                     <div class="field">
                         <label for="contact-name">Name</label>

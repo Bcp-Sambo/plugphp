@@ -18,10 +18,10 @@ $posts = $posts ?? [];
             <h1 class="h-display" style="margin-top:18px">A modular, agent-ready PHP starter kit.</h1>
             <p class="lead" style="margin-top:20px">Build real, secure, SEO-ready websites on the cheapest shared hosting — with a web installer, an admin dashboard, and no framework to learn. This whole site is the default PlugPHP template.</p>
             <div class="btn-row">
-                <a class="btn btn-cta" href="/contact">Get started
+                <a class="btn btn-cta" href="<?= url('/contact') ?>">Get started
                     <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </a>
-                <a class="btn btn-secondary" href="/projects">See what you can build</a>
+                <a class="btn btn-secondary" href="<?= url('/projects') ?>">See what you can build</a>
             </div>
         </div>
         <div class="ratio ratio-16x9">
@@ -38,11 +38,11 @@ $posts = $posts ?? [];
                 <span class="eyebrow">01 / Features</span>
                 <h2 class="h-section">What you get</h2>
             </div>
-            <a class="textlink" href="/services">All features &rarr;</a>
+            <a class="textlink" href="<?= url('/services') ?>">All features &rarr;</a>
         </div>
         <div class="grid grid--services">
             <?php foreach ($services as $i => $s): ?>
-                <a class="card card-link" href="/services/<?= e($s['slug']) ?>">
+                <a class="card card-link" href="<?= url('/services/' . $s['slug']) ?>">
                     <span class="card__icon card__icon--num"><?= e(str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT)) ?></span>
                     <h3><?= e($s['title']) ?></h3>
                     <?php if (!empty($s['summary'])): ?><p><?= e($s['summary']) ?></p><?php endif; ?>
@@ -61,11 +61,11 @@ $posts = $posts ?? [];
                 <span class="eyebrow">02 / Journal</span>
                 <h2 class="h-section">Latest from the blog</h2>
             </div>
-            <a class="textlink" href="/blog">All posts &rarr;</a>
+            <a class="textlink" href="<?= url('/blog') ?>">All posts &rarr;</a>
         </div>
         <div class="grid grid--posts">
             <?php foreach ($posts as $p): ?>
-                <a href="/blog/<?= e($p['slug']) ?>" style="display:block">
+                <a href="<?= url('/blog/' . $p['slug']) ?>" style="display:block">
                     <div class="ratio ratio-16x9">
                         <span class="img-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>16:9</span></span>
                     </div>

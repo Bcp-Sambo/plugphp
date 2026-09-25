@@ -7,10 +7,10 @@ $error = $error ?? null;
 $pageTitle = 'Log in';
 $bareLayout = true;
 $brandName = Config::get('APP_NAME', 'PlugPHP');
-$mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" height="34">';
+$mark = '<img class="brand__mark" src="' . asset('/assets/img/logo.png') . '" alt="" width="34" height="34">';
 ?>
 <div class="auth">
-    <a class="auth__brand" href="/"><?= $mark ?><span><?= e($brandName) ?></span></a>
+    <a class="auth__brand" href="<?= url('/') ?>"><?= $mark ?><span><?= e($brandName) ?></span></a>
     <div class="auth-card">
         <h1>Log in</h1>
         <p class="auth-card__sub">Access your dashboard.</p>
@@ -22,7 +22,7 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
             </div>
         <?php endif; ?>
 
-        <form method="post" action="/login">
+        <form method="post" action="<?= url('/login') ?>">
             <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
             <div class="field">
                 <label for="login-email">Email</label>
@@ -31,7 +31,7 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
             <div class="field">
                 <div class="label-row">
                     <label for="login-password">Password</label>
-                    <a class="textlink" style="font-size:12.5px" href="/forgot-password">Forgot?</a>
+                    <a class="textlink" style="font-size:12.5px" href="<?= url('/forgot-password') ?>">Forgot?</a>
                 </div>
                 <input class="input" type="password" id="login-password" name="password" required autocomplete="current-password">
             </div>
@@ -39,7 +39,7 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
         </form>
 
         <?php if (AuthModule::publicRegistrationEnabled()): ?>
-            <p class="auth-card__foot">No account? <a class="textlink" href="/register">Register</a></p>
+            <p class="auth-card__foot">No account? <a class="textlink" href="<?= url('/register') ?>">Register</a></p>
         <?php endif; ?>
     </div>
 </div>

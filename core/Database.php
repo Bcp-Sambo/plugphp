@@ -111,14 +111,111 @@ final class Database
         return $stmt->rowCount();
     }
 
-    /** Run a module's migration SQL file. Migrations are trusted files, not user input. */
+    /**
+     * Run a migration SQL file exactly once.
+     *
+     * Migrations are trusted files shipped with the kit, never user input.
+     * Every applied file is recorded in `migrations_log`, so re-running the
+     * install flow — or applying an update package that ships old migrations
+     * alongside new ones — silently skips work that is already done instead
+     * of re-executing it.
+     *
+     * AI AGENTS: never bypass this to exec() DDL directly. A migration that
+     * is not logged here is a migration the updater cannot reason about.
+     */
     public static function runMigrationFile(string $filePath): void
     {
         $sql = file_get_contents($filePath);
         if ($sql === false) {
             throw new RuntimeException("Could not read migration file: {$filePath}");
         }
+
+        self::ensureMigrationsLog();
+
+        $key = self::migrationKey($filePath);
+        if (self::migrationWasApplied($key)) {
+            return;
+        }
+
         self::connection()->exec($sql);
+        self::logMigration($key);
+    }
+
+    /** True if $migrationKey is already recorded in migrations_log. */
+    public static function migrationWasApplied(string $migrationKey): bool
+    {
+        self::ensureMigrationsLog();
+
+        return self::fetchOne(
+            'SELECT id FROM migrations_log WHERE migration_file = :file',
+            ['file' => $migrationKey]
+        ) !== null;
+    }
+
+    /**
+     * Identify a migration by its path relative to the project root
+     * (e.g. "modules/blog/migrations/001_create_posts.sql") rather than by
+     * bare filename. Two modules can legitimately both ship an
+     * "001_create_items.sql"; a bare basename would make the second one
+     * look already-applied and silently skip its table.
+     */
+    private static function migrationKey(string $filePath): string
+    {
+        $root = realpath(__DIR__ . '/..');
+        $real = realpath($filePath);
+
+        if ($real === false) {
+            // File is unreadable; fall back to the path as given so the
+            // caller still gets a deterministic key rather than a crash.
+            $real = $filePath;
+        }
+
+        $real = str_replace('\\', '/', $real);
+
+        if ($root !== false) {
+            $root = str_replace('\\', '/', $root) . '/';
+            if (str_starts_with($real, $root)) {
+                $real = substr($real, strlen($root));
+            }
+        }
+
+        return $real;
+    }
+
+    /**
+     * Create migrations_log if it is missing. Run directly rather than through
+     * runMigrationFile(), which would need the table to already exist in order
+     * to decide whether to create it.
+     */
+    private static function ensureMigrationsLog(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+
+        self::connection()->exec(
+            'CREATE TABLE IF NOT EXISTS migrations_log ('
+            . ' id INT AUTO_INCREMENT PRIMARY KEY,'
+            . ' migration_file VARCHAR(255) NOT NULL UNIQUE,'
+            . ' applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+
+        $ensured = true;
+    }
+
+    private static function logMigration(string $migrationKey): void
+    {
+        try {
+            self::insert('migrations_log', ['migration_file' => $migrationKey]);
+        } catch (PDOException $e) {
+            // A concurrent request logged the same migration first. The
+            // UNIQUE constraint did its job; the migration ran either way.
+            if (!str_contains($e->getMessage(), '1062')) {
+                throw $e;
+            }
+        }
     }
 
     /**

@@ -128,7 +128,7 @@ final class ServicesModule extends Module
         $data['slug'] = $this->uniqueSlug($this->slugSource(), null);
         Database::insert('services', $data);
 
-        header('Location: /admin/services');
+        header('Location: ' . Url::to('/admin/services'));
         exit;
     }
 
@@ -171,7 +171,7 @@ final class ServicesModule extends Module
         $data['slug'] = $this->uniqueSlug($this->slugSource(), $id);
         Database::update('services', $data, 'id', $id);
 
-        header('Location: /admin/services');
+        header('Location: ' . Url::to('/admin/services'));
         exit;
     }
 
@@ -197,7 +197,7 @@ final class ServicesModule extends Module
 
         Database::delete('services', 'id', $id);
 
-        header('Location: /admin/services');
+        header('Location: ' . Url::to('/admin/services'));
         exit;
     }
 
@@ -208,7 +208,7 @@ final class ServicesModule extends Module
 
         Settings::set('services_visible', isset($_POST['visible']) ? '1' : '0');
 
-        header('Location: /admin/services');
+        header('Location: ' . Url::to('/admin/services'));
         exit;
     }
 
@@ -271,9 +271,14 @@ final class ServicesModule extends Module
         }
     }
 
+    /**
+     * Absolute URL for canonical / Open Graph / JSON-LD. Delegates to
+     * Url::absolute(), which builds from APP_URL and never from the
+     * request Host header.
+     */
     private function canonical(string $path): string
     {
-        return rtrim((string) Config::get('APP_URL', ''), '/') . $path;
+        return Url::absolute($path);
     }
 
     /** Plain-text meta description from possibly-multiline text. */
@@ -329,12 +334,13 @@ final class ServicesModule extends Module
         ];
     }
 
+    /**
+     * Absolute URL for an image or asset reference. Url::absolute() passes
+     * an already-absolute http(s) URL through untouched.
+     */
     private function absoluteUrl(string $url): string
     {
-        if (preg_match('#^https?://#i', $url)) {
-            return $url;
-        }
-        return rtrim((string) Config::get('APP_URL', ''), '/') . '/' . ltrim($url, '/');
+        return Url::absolute($url);
     }
 
     private function renderNotFound(): void

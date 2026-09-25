@@ -43,3 +43,21 @@ settings screen.
 ## Dashboard nav
 Registers "Blog" in the admin sidebar via `dashboardNavItem()`, linking to
 `/admin/blog`.
+
+## URLs — deployment portability
+
+This site may be served from a main domain, a subdomain, or a subfolder, so
+no URL in this module may be a leading-slash literal.
+
+- Public links and form actions in views: `url('/blog')`, never `href="/blog"`.
+- Assets and uploaded images: `asset($row['featured_image'])`.
+- Canonical, Open Graph and JSON-LD URLs: `Url::absolute($path)`. This module's
+  private `canonical()` / `absoluteUrl()` helpers delegate to it — keep them
+  delegating rather than rebuilding the string from `APP_URL` by hand.
+- Redirects after a POST: `header('Location: ' . Url::to('/admin/...'))`.
+
+`url()` and `asset()` escape their output; `Url::to()` and `Url::absolute()`
+do not. Never wrap `url()`/`asset()` in `e()`.
+
+`Url::absolute()` derives its host from `APP_URL`, never from the request's
+Host header — see the root `SKILL.md` for why that matters.

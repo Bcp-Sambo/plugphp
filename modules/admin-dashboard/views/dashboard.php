@@ -13,7 +13,7 @@ $recentMessages = $recentMessages ?? [];
     <div class="grid grid--stats">
         <?php foreach ($stats as $s): ?>
             <?php if (!empty($s['url'])): ?>
-                <a class="stat-card" href="<?= e($s['url']) ?>">
+                <a class="stat-card" href="<?= url($s['url']) ?>">
                     <div class="stat-card__label"><?= e($s['label']) ?></div>
                     <div class="stat-card__count"><?= e((string) $s['count']) ?></div>
                 </a>

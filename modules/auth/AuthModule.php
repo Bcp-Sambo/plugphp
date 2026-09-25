@@ -68,7 +68,7 @@ final class AuthModule extends Module
         $password = (string) ($_POST['password'] ?? '');
 
         if (Auth::attemptLogin($email, $password)) {
-            header('Location: /admin');
+            header('Location: ' . Url::to('/admin'));
             exit;
         }
 
@@ -80,7 +80,7 @@ final class AuthModule extends Module
     {
         Auth::requireCsrf($_POST['csrf_token'] ?? null);
         Auth::logout();
-        header('Location: /login');
+        header('Location: ' . Url::to('/login'));
         exit;
     }
 
@@ -120,7 +120,7 @@ final class AuthModule extends Module
         }
 
         Auth::attemptLogin($email, $password);
-        header('Location: /admin');
+        header('Location: ' . Url::to('/admin'));
         exit;
     }
 
@@ -188,7 +188,7 @@ final class AuthModule extends Module
             return;
         }
 
-        header('Location: /login');
+        header('Location: ' . Url::to('/login'));
         exit;
     }
 

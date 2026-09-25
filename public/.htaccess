@@ -10,6 +10,12 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # NO RewriteBase, deliberately. Hardcoding one makes this file correct
+    # in exactly one mount location and produces blanket 404s or rewrite
+    # loops everywhere else — a main domain, a subdomain and a subfolder are
+    # three different mount locations. Omitting it lets Apache infer the base
+    # per-request, which is correct in all three.
+
     # Force HTTPS. LEAVE THIS COMMENTED until SSL is active for the domain
     # (cPanel AutoSSL), otherwise you can hit a redirect loop while the
     # certificate is still provisioning. Uncomment once https:// works.

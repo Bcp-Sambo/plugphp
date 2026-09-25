@@ -7,10 +7,10 @@ $sent = $sent ?? false;
 $pageTitle = 'Reset your password';
 $bareLayout = true;
 $brandName = Config::get('APP_NAME', 'PlugPHP');
-$mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" height="34">';
+$mark = '<img class="brand__mark" src="' . asset('/assets/img/logo.png') . '" alt="" width="34" height="34">';
 ?>
 <div class="auth">
-    <a class="auth__brand" href="/"><?= $mark ?><span><?= e($brandName) ?></span></a>
+    <a class="auth__brand" href="<?= url('/') ?>"><?= $mark ?><span><?= e($brandName) ?></span></a>
     <div class="auth-card">
         <h1>Forgot your password?</h1>
         <p class="auth-card__sub">Enter your email and we'll send a reset link.</p>
@@ -21,7 +21,7 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
                 If that email exists, a reset link has been sent.
             </div>
         <?php else: ?>
-            <form method="post" action="/forgot-password">
+            <form method="post" action="<?= url('/forgot-password') ?>">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <div class="field">
                     <label for="forgot-email">Email</label>
@@ -31,6 +31,6 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
             </form>
         <?php endif; ?>
 
-        <p class="auth-card__foot"><a class="textlink" href="/login">&larr; Back to log in</a></p>
+        <p class="auth-card__foot"><a class="textlink" href="<?= url('/login') ?>">&larr; Back to log in</a></p>
     </div>
 </div>

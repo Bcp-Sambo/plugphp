@@ -16,7 +16,7 @@ read the relevant one before touching that module.
 | `/public/index.php` | **No.** Bootstrap file, not a place for feature code. |
 | `.env` | Yes, to fill in real credentials. Never commit real values to git. |
 
-## The five hard rules
+## The six hard rules
 
 1. **Never write raw SQL in a view or route file.** All database access goes
    through `Database::fetchOne()`, `fetchAll()`, `insert()`, `update()`,
@@ -41,6 +41,32 @@ read the relevant one before touching that module.
    `Auth::requireCsrf($_POST['csrf_token'] ?? null)` as its first line.**
    No exceptions, including on forms that feel "low risk" like contact forms.
 
+6. **Never write a leading-slash literal URL.** A PlugPHP site can be served
+   from a main domain, a subdomain, OR a subfolder, and `href="/blog"`
+   resolves against the domain root — so every link and asset 404s at once
+   the moment the site is not at the root. Use the helpers in `core/Url.php`:
+
+   | Context | Use | Escapes? |
+   |---|---|---|
+   | Link / form `action` in a view | `url('/blog')` | yes |
+   | Asset (CSS/JS/image) in a view | `asset('/assets/css/app.css')` | yes |
+   | Redirect, or any PHP logic | `Url::to('/admin')` | no (raw) |
+   | Canonical, Open Graph, sitemap, email link | `Url::absolute('/blog/x')` | no (raw) |
+
+   `url()`/`asset()` already apply `e()`, so do **not** wrap them in `e()`
+   again. `Url::to()`/`Url::absolute()` return raw strings for use in
+   `header('Location: ...')` and email bodies.
+
+   This applies to values too, not just literals: a URL that arrives from the
+   database or a data array still needs `url($item['url'])`, not
+   `e($item['url'])`.
+
+   **Host-header security rule:** `Url::absolute()` builds from `APP_URL` and
+   never from `$_SERVER['HTTP_HOST']`. `HTTP_HOST` is attacker-controllable.
+   A password-reset link built from it lets an attacker mail a victim a reset
+   URL pointing at a host the attacker controls, with a valid token attached.
+   Never introduce a code path that derives an emailed or canonical URL from
+   the request host.
 ## Frontend/UI expectations
 
 - Views ship as **minimal, unstyled semantic HTML placeholders** — this is
@@ -105,6 +131,62 @@ exists at all).
   module's own dashboard settings screen — not a separate global
   "site settings" module.
 
+## Auto-update boundaries
+
+A site owner can apply a PlugPHP update from `/admin/updates`. That update has
+write access to `core/`, so what it may and may not touch is a hard boundary,
+not a convention. `core/Updater.php` enforces it on the installer side and
+`tools/build-release.php` enforces it again when a release is packaged — a
+package containing anything outside the list is rejected whole.
+
+**Safe to overwrite — infrastructure, never hand-edited by a site's developer:**
+
+- `core/*.php`
+- `core/migrations/*.sql`
+- `modules/*/[Name]Module.php`
+- `modules/*/routes.php`
+- `modules/*/migrations/*.sql`
+- `public/index.php`
+
+**Never touched by an update, under any circumstance:**
+
+- `modules/*/views/*` — the developer's UI work
+- `resources/layout.php`, `resources/404.php` — branding and styling
+- `.env` — site-specific secrets and configuration
+- `config/modules.php` — the site's enabled-module list
+- `public/.htaccess` and the root `.htaccess` — may carry custom redirects or
+  headers. If a patch needs an `.htaccess` change it is surfaced as a manual
+  diff for the owner to review, never applied automatically.
+- `vendor/` — dependency updates are a manual reupload. Auto-update cannot
+  ship a patched PHPMailer; that is a deliberate trade for a narrow blast
+  radius, and it means a dependency CVE needs a full redownload of the kit.
+
+**What this means when you build something:**
+
+- Anything a developer is expected to restyle belongs in `views/` or
+  `resources/`. Put it anywhere else and an update will overwrite their work.
+- Anything that must survive an update — a site's own setting, a toggle, a
+  piece of owner-entered content — belongs in the database via `Settings`, not
+  in a file under `core/` or `modules/*/`.
+- Do not widen the safe list. It is the entire safety guarantee of the feature.
+
+`core/` is not a module, but additions to it (`Updater.php`, `Url.php`,
+`Settings.php`) follow the same conventions as the rest of `core/`: final
+classes, static methods, no raw SQL outside `Database.php`, and one choke
+point per concern rather than a helper scattered across modules.
+
+## Migrations
+
+Every migration runs through `Database::runMigrationFile()`, which records it
+in `migrations_log` and skips anything already applied. Migrations are keyed by
+their path relative to the project root, so two modules may both ship an
+`001_create_items.sql` without colliding.
+
+Migrations are **forward-only**. A rollback restores code files but never
+reverses schema changes — undoing an `ALTER TABLE` would destroy data. Write
+migrations so that older code tolerates the newer schema: add columns as
+nullable or with defaults, and never rename or drop a column that shipped
+code still reads.
 ## If you're not sure
 
 Say so, and ask, rather than improvising a workaround — especially for
