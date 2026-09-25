@@ -1,19 +1,43 @@
 # Defense in depth for user-uploaded files (Apache / cPanel hosts).
-# Even though core/Upload.php re-encodes every image and strips the execute
-# bit, this ensures nothing in this tree is ever handled by the PHP engine.
+#
+# core/Upload.php already re-encodes every image through GD, chooses the
+# extension itself from the sniffed bytes, gives the file a random name, and
+# stores it 0644. A PHP file cannot legitimately end up in this tree. This
+# file is the belt-and-braces layer in case it somehow does.
+#
+# NOTE FOR ANYONE EDITING THIS: php_admin_flag and php_admin_value are
+# server-config/vhost directives. Apache rejects them in .htaccess with
+# "php_admin_flag not allowed here" and returns 500 — which, on a host running
+# mod_php, makes every uploaded image unviewable. php_flag is the .htaccess
+# form. Test an actual uploaded image after any change here.
 
-# Disable any PHP execution here.
+Options -Indexes
+
+# Refuse to serve anything that could be executed as a script.
+<FilesMatch "\.(php|php[0-9]|phtml|phps|phar|pl|py|cgi|sh|shtml)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Strip any handler or type mapping that would hand a file here to an
+# interpreter, for hosts that map extensions outside the list above.
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .phar .php3 .php4 .php5 .php7 .php8
+    RemoveType .php .phtml .phar
+</IfModule>
+
+# Turn the PHP engine off for this tree on mod_php hosts.
 <IfModule mod_php.c>
-    php_admin_flag engine off
+    php_flag engine off
 </IfModule>
 <IfModule mod_php7.c>
-    php_admin_flag engine off
+    php_flag engine off
 </IfModule>
 <IfModule mod_php8.c>
-    php_admin_flag engine off
+    php_flag engine off
 </IfModule>
-
-# Belt and braces: refuse to run known script handlers as scripts.
-<FilesMatch "\.(php|php[0-9]|phtml|phar|pl|py|cgi|sh)$">
-    Require all denied
-</FilesMatch>

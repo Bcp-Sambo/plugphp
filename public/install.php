@@ -188,6 +188,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // Always written off: HSTS before the SSL cert exists makes the
                 // site unreachable. The owner turns it on once https:// works.
                 'FORCE_HSTS' => 'false',
+                // Encrypts dashboard-stored secrets. Generated per install:
+                // a shared or committed key would make every site's stored
+                // SMTP password readable by anyone holding that key.
+                'APP_KEY'   => base64_encode(random_bytes(32)),
                 'DB_HOST'   => $old['db_host'] !== '' ? $old['db_host'] : '127.0.0.1',
                 'DB_NAME'   => $old['db_name'],
                 'DB_USER'   => $old['db_user'],

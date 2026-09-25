@@ -38,15 +38,24 @@ final class Upload
     /**
      * Validate, re-encode, and store one uploaded image.
      *
-     * @param array  $file   One entry from $_FILES (e.g. $_FILES['featured_image']).
-     * @param string $subdir Destination subfolder under public/uploads (e.g. 'projects').
+     * @param array    $file      One entry from $_FILES (e.g. $_FILES['featured_image']).
+     * @param string   $subdir    Destination subfolder under public/uploads (e.g. 'projects').
+     * @param int|null $maxBytes  Override the 5 MB default. Branding uploads use
+     *                            a smaller cap — shared-hosting quotas are tight
+     *                            and a logo has no business being 5 MB.
+     * @param string[]|null $onlyTypes Restrict to a subset of the supported
+     *                            extensions, e.g. ['png'] for a favicon. null
+     *                            allows all of them.
      * @return string        Public web path to the stored file, e.g. "/uploads/projects/ab12….jpg".
      *
      * @throws RuntimeException on any validation or processing failure — the
      *         caller should catch this and surface a friendly message.
      */
-    public static function image(array $file, string $subdir): string
+    public static function image(array $file, string $subdir, ?int $maxBytes = null, ?array $onlyTypes = null): string
     {
+        $maxBytes ??= self::MAX_BYTES;
+        $allowed = self::allowedFor($onlyTypes);
+
         if (!extension_loaded('gd')) {
             throw new RuntimeException('Image uploads require the GD extension, which is not installed.');
         }
@@ -63,15 +72,17 @@ final class Upload
             throw new RuntimeException('Invalid upload.');
         }
 
-        if ((int) ($file['size'] ?? 0) > self::MAX_BYTES) {
-            throw new RuntimeException('Image is too large (maximum 5 MB).');
+        if ((int) ($file['size'] ?? 0) > $maxBytes) {
+            throw new RuntimeException('Image is too large (maximum ' . self::humanSize($maxBytes) . ').');
         }
 
         $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
-        if (!is_string($mime) || !isset(self::ALLOWED[$mime])) {
-            throw new RuntimeException('Unsupported image type. Allowed: JPEG, PNG, GIF, WebP.');
+        if (!is_string($mime) || !isset($allowed[$mime])) {
+            throw new RuntimeException(
+                'Unsupported image type. Allowed: ' . self::describe($allowed) . '.'
+            );
         }
-        $ext = self::ALLOWED[$mime];
+        $ext = $allowed[$mime];
 
         $image = self::loadImage($tmp, $mime);
         if (!$image instanceof \GdImage) {
@@ -93,6 +104,55 @@ final class Upload
         return '/uploads/' . self::safeSubdir($subdir) . '/' . $filename;
     }
 
+    /**
+     * The sniffed-MIME => stored-extension map, optionally narrowed.
+     *
+     * Note the direction: the caller names extensions it will accept, but the
+     * decision is still made on the file's real sniffed MIME type. The client's
+     * filename never selects the extension — the server does, from the bytes.
+     * SVG is absent from the map entirely and so can never be stored: it is XML
+     * and can carry <script>, and GD cannot re-encode it to strip that.
+     *
+     * @param string[]|null $onlyTypes
+     * @return array<string,string>
+     */
+    private static function allowedFor(?array $onlyTypes): array
+    {
+        if ($onlyTypes === null) {
+            return self::ALLOWED;
+        }
+
+        $wanted = array_map(
+            static fn($e) => strtolower(ltrim((string) $e, '.')),
+            $onlyTypes
+        );
+        // 'jpeg' and 'jpg' mean the same stored extension.
+        $wanted = array_map(static fn($e) => $e === 'jpeg' ? 'jpg' : $e, $wanted);
+
+        $allowed = array_filter(self::ALLOWED, static fn($ext) => in_array($ext, $wanted, true));
+
+        if ($allowed === []) {
+            throw new InvalidArgumentException(
+                'No supported image type requested. Supported: ' . implode(', ', array_unique(array_values(self::ALLOWED))) . '.'
+            );
+        }
+
+        return $allowed;
+    }
+
+    /** @param array<string,string> $allowed */
+    private static function describe(array $allowed): string
+    {
+        $names = array_map('strtoupper', array_unique(array_values($allowed)));
+        return implode(', ', $names);
+    }
+
+    private static function humanSize(int $bytes): string
+    {
+        return $bytes >= 1048576
+            ? rtrim(rtrim(number_format($bytes / 1048576, 1), '0'), '.') . ' MB'
+            : max(1, (int) round($bytes / 1024)) . ' KB';
+    }
     private static function loadImage(string $path, string $mime): \GdImage|false
     {
         return match ($mime) {
