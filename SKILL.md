@@ -130,7 +130,37 @@ exists at all).
 - Expose the toggle itself as a simple on/off control inside that
   module's own dashboard settings screen — not a separate global
   "site settings" module.
+- **Unregistering the routes is only half the job.** The module's public
+  links must disappear too, or the site keeps advertising a page that now
+  404s. That is handled for you: contribute the link through
+  `Module::publicNavItem()` and `Nav` drops it automatically when the
+  toggle is off. See "Public navigation" below.
 
+## Public navigation
+
+The public nav is built from the enabled modules, not written into
+`resources/layout.php`. A module contributes its own link:
+
+```php
+public function publicNavItem(): ?array
+{
+    return ['label' => 'Blog', 'url' => '/blog'];
+    // add 'primary' => true for the highlighted call-to-action button
+}
+```
+
+`Nav::publicItems()` collects them in the order modules are enabled and drops
+any module the owner has hidden from the dashboard. A module does **not**
+check its own visibility there — `Nav` does it.
+
+**Never hardcode a module's link into a layout.** A hardcoded link survives
+the module being disabled: its routes unregister, so the page returns 404,
+but the link stays in the header, the mobile menu and the footer and sends
+visitors straight to that 404. That was a real bug, fixed by this mechanism.
+
+Return `null` from `publicNavItem()` for modules with no public page (auth,
+admin-dashboard) — that is the default, so most admin-only modules need
+nothing.
 ## Auto-update boundaries
 
 A site owner can apply a PlugPHP update from `/admin/updates`. That update has

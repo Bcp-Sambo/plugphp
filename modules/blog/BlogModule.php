@@ -37,6 +37,18 @@ final class BlogModule extends Module
         return [__DIR__ . '/migrations/001_create_posts.sql'];
     }
 
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'Blog',
+            'url'   => '/blog',
+        ];
+    }
+
     public function dashboardNavItem(): ?array
     {
         return ['label' => 'Blog', 'url' => '/admin/blog'];

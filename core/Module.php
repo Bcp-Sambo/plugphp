@@ -38,4 +38,23 @@ abstract class Module
     {
         return null;
     }
+
+    /**
+     * Optional: public site nav entry this module contributes.
+     *
+     * Return ['label' => 'Blog', 'url' => '/blog'] — plus 'primary' => true
+     * to render as the highlighted call-to-action button. Return null when a
+     * module has no public-facing page (auth, admin-dashboard).
+     *
+     * Nav::publicItems() drops entries whose module has been hidden from the
+     * dashboard, so a module does NOT need to check its own visibility here.
+     *
+     * AI AGENTS: a module's public links belong here, not hardcoded into
+     * resources/layout.php. A hardcoded link survives the module being
+     * disabled and points visitors at a 404.
+     */
+    public function publicNavItem(): ?array
+    {
+        return null;
+    }
 }

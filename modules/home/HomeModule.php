@@ -109,4 +109,16 @@ final class HomeModule extends Module
             'headExtra'       => $head,
         );
     }
+
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'Home',
+            'url'   => '/',
+        ];
+    }
 }

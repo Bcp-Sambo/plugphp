@@ -35,6 +35,18 @@ final class ServicesModule extends Module
         return [__DIR__ . '/migrations/001_create_services.sql'];
     }
 
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'Services',
+            'url'   => '/services',
+        ];
+    }
+
     public function dashboardNavItem(): ?array
     {
         return ['label' => 'Services', 'url' => '/admin/services'];

@@ -32,4 +32,16 @@ final class AboutModule extends Module
 
     // dashboardNavItem() intentionally not overridden: this module has no
     // admin presence (Option A), so it inherits the base null.
+
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'About',
+            'url'   => '/about',
+        ];
+    }
 }

@@ -38,6 +38,19 @@ final class ContactFormModule extends Module
         return [__DIR__ . '/migrations/001_create_contact_submissions.sql'];
     }
 
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'Contact',
+            'url'   => '/contact',
+            'primary' => true,   // rendered as the call-to-action button
+        ];
+    }
+
     public function dashboardNavItem(): ?array
     {
         return ['label' => 'Messages', 'url' => '/admin/messages'];

@@ -15,6 +15,14 @@ $brandName = Config::get('APP_NAME', 'PlugPHP');
 // A view may set $bareLayout = true to render without the public header/footer
 // (used for the centered auth screens). The view then owns the full chrome.
 $bareLayout = $bareLayout ?? false;
+
+// Nav is built from the enabled modules, so hiding a module from the
+// dashboard removes its links here too. Never hardcode a module's link
+// below — a hardcoded link outlives the module being disabled and sends
+// visitors to a 404.
+$navItems    = Nav::publicItems();
+$footerItems = array_values(array_filter(Nav::secondaryItems(), fn($i) => $i['url'] !== '/'));
+$primaryItem = Nav::primaryItem();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,24 +51,18 @@ $bareLayout = $bareLayout ?? false;
                 <span><?= e($brandName) ?></span>
             </a>
             <nav class="nav" aria-label="Primary">
-                <a href="<?= url('/') ?>">Home</a>
-                <a href="<?= url('/about') ?>">About</a>
-                <a href="<?= url('/services') ?>">Services</a>
-                <a href="<?= url('/projects') ?>">Projects</a>
-                <a href="<?= url('/blog') ?>">Blog</a>
-                <a class="btn btn-primary" href="<?= url('/contact') ?>">Contact</a>
+                <?php foreach ($navItems as $item): ?>
+                    <a<?= $item['primary'] ? ' class="btn btn-primary"' : '' ?> href="<?= url($item['url']) ?>"><?= e($item['label']) ?></a>
+                <?php endforeach; ?>
             </nav>
             <label for="nav-toggle" class="nav-burger" aria-label="Toggle menu">
                 <span></span><span></span><span></span>
             </label>
         </div>
         <nav class="nav--mobile" aria-label="Mobile">
-            <a href="<?= url('/') ?>">Home</a>
-            <a href="<?= url('/about') ?>">About</a>
-            <a href="<?= url('/services') ?>">Services</a>
-            <a href="<?= url('/projects') ?>">Projects</a>
-            <a href="<?= url('/blog') ?>">Blog</a>
-            <a class="btn btn-primary btn-block" href="<?= url('/contact') ?>">Contact</a>
+            <?php foreach ($navItems as $item): ?>
+                <a<?= $item['primary'] ? ' class="btn btn-primary btn-block"' : '' ?> href="<?= url($item['url']) ?>"><?= e($item['label']) ?></a>
+            <?php endforeach; ?>
         </nav>
     </header>
 
@@ -79,14 +81,15 @@ $bareLayout = $bareLayout ?? false;
             </div>
             <div class="site-footer__col">
                 <h2>Site</h2>
-                <a href="<?= url('/about') ?>">About</a>
-                <a href="<?= url('/services') ?>">Services</a>
-                <a href="<?= url('/projects') ?>">Projects</a>
-                <a href="<?= url('/blog') ?>">Blog</a>
+                <?php foreach ($footerItems as $item): ?>
+                    <a href="<?= url($item['url']) ?>"><?= e($item['label']) ?></a>
+                <?php endforeach; ?>
             </div>
             <div class="site-footer__col">
                 <h2>Get in touch</h2>
-                <a href="<?= url('/contact') ?>">Contact</a>
+                <?php if ($primaryItem !== null): ?>
+                    <a href="<?= url($primaryItem['url']) ?>"><?= e($primaryItem['label']) ?></a>
+                <?php endif; ?>
                 <a class="site-footer__admin" href="<?= url('/login') ?>">Admin log in &rarr;</a>
             </div>
         </div>

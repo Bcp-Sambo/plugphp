@@ -195,6 +195,31 @@ attached. `APP_URL` must therefore be the site's full public root, including
 the subfolder if there is one — the detected base is not appended on top.
 
 ---
+## Nav
+
+Builds the public site navigation from the enabled modules, dropping any the
+owner has hidden from the dashboard.
+
+```php
+Nav::publicItems();      // [['label'=>, 'url'=>, 'primary'=>bool], ...]
+Nav::secondaryItems();   // the same, excluding the primary call-to-action
+Nav::primaryItem();      // the call-to-action item, or null
+```
+
+A module contributes its link through `Module::publicNavItem()`; `Nav` applies
+the visibility check, so modules never test their own. Results are memoised
+per request.
+
+The nav used to be hardcoded in `resources/layout.php`. Hiding Services
+correctly unregistered its routes, so `/services` returned 404 — but the three
+hardcoded links stayed in the header, mobile menu and footer, pointing
+visitors at that 404. Building it from the module list is what makes the
+dashboard toggle actually mean something.
+
+`Nav` falls back to showing an item when the visibility lookup throws, so the
+layout still renders (including the 404 page) when the database is down.
+
+---
 ## Router
 
 `core/Router.php` — the route table. You don't instantiate it; the front

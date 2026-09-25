@@ -36,6 +36,18 @@ final class ProjectsModule extends Module
         return [__DIR__ . '/migrations/001_create_projects.sql'];
     }
 
+    /**
+     * Public nav entry. Nav::publicItems() drops this automatically when
+     * the module is hidden from the dashboard, so no visibility check here.
+     */
+    public function publicNavItem(): ?array
+    {
+        return [
+            'label' => 'Projects',
+            'url'   => '/projects',
+        ];
+    }
+
     public function dashboardNavItem(): ?array
     {
         return ['label' => 'Projects', 'url' => '/admin/projects'];
