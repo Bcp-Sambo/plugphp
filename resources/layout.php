@@ -34,9 +34,11 @@ $primaryItem = Nav::primaryItem();
     <meta name="description" content="<?= e($metaDescription) ?>">
     <?php endif; ?>
     <?= $headExtra /* canonical / Open Graph / JSON-LD, pre-escaped by the module */ ?>
+    <?= Tracking::headSnippet() /* GA4; empty unless enabled + a valid ID is saved */ ?>
     <link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
 </head>
 <body>
+<?= Tracking::bodySnippet() /* Facebook Pixel; empty unless enabled + a valid ID is saved */ ?>
     <a class="skip-link" href="#pp-main">Skip to content</a>
 
     <?php if ($bareLayout): ?>

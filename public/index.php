@@ -19,6 +19,7 @@ require_once __DIR__ . '/../core/Module.php';
 require_once __DIR__ . '/../core/Nav.php';
 require_once __DIR__ . '/../core/Settings.php';
 require_once __DIR__ . '/../core/Crypto.php';
+require_once __DIR__ . '/../core/Tracking.php';
 require_once __DIR__ . '/../core/Updater.php';
 
 Config::load(__DIR__ . '/../.env');
