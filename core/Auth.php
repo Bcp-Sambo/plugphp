@@ -92,7 +92,7 @@ final class Auth
     {
         if (!self::check()) {
             http_response_code(302);
-            header('Location: /login');
+            header('Location: ' . Url::to('/login'));
             exit;
         }
     }

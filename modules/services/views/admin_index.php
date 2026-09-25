@@ -8,7 +8,7 @@ $services = $services ?? [];
 $visible = $visible ?? true;
 ?>
 <div class="admin-toolbar">
-    <form method="post" action="/admin/services/visibility">
+    <form method="post" action="<?= url('/admin/services/visibility') ?>">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <?php if (!$visible): ?><input type="hidden" name="visible" value="1"><?php endif; ?>
         <button type="submit" class="toggle-field" aria-pressed="<?= $visible ? 'true' : 'false' ?>">
@@ -16,7 +16,7 @@ $visible = $visible ?? true;
             Show services on the public site
         </button>
     </form>
-    <a class="btn btn-primary btn-sm" href="/admin/services/new">
+    <a class="btn btn-primary btn-sm" href="<?= url('/admin/services/new') ?>">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         Add new service
     </a>
@@ -42,8 +42,8 @@ $visible = $visible ?? true;
                         <td class="td-strong"><?= e($s['title']) ?></td>
                         <td class="td-slug"><?= e($s['slug']) ?></td>
                         <td class="td-actions">
-                            <a href="/admin/services/<?= e((string) $s['id']) ?>/edit">Edit</a>
-                            <a class="danger" href="/admin/services/<?= e((string) $s['id']) ?>/delete">Delete</a>
+                            <a href="<?= url('/admin/services/' . (string) $s['id'] . '/edit') ?>">Edit</a>
+                            <a class="danger" href="<?= url('/admin/services/' . (string) $s['id'] . '/delete') ?>">Delete</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

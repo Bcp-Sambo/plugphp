@@ -15,10 +15,10 @@ $projects = $projects ?? [];
     <?php else: ?>
         <div class="grid grid--projects" style="margin-top:36px">
             <?php foreach ($projects as $p): ?>
-                <a href="/projects/<?= e($p['slug']) ?>" style="display:block">
+                <a href="<?= url('/projects/' . $p['slug']) ?>" style="display:block">
                     <div class="ratio ratio-4x3">
                         <?php if (!empty($p['featured_image'])): ?>
-                            <img src="<?= e($p['featured_image']) ?>" alt="<?= e($p['title']) ?>" loading="lazy">
+                            <img src="<?= asset($p['featured_image']) ?>" alt="<?= e($p['title']) ?>" loading="lazy">
                         <?php else: ?>
                             <span class="img-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Featured · 4:3</span></span>
                         <?php endif; ?>

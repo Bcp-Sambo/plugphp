@@ -77,6 +77,37 @@ $checks = array(
 /** Hard blockers — install cannot proceed until these pass. */
 $canInstall = $phpOk && $pdoMysql && $rootW && $configW;
 
+/**
+ * Best guess at the site's public URL, from the request that loaded this
+ * installer. Pre-filling this kills the most common deploy trap: an .env
+ * copied from a previous site, leaving APP_URL pointing at the old host so
+ * canonical tags, Open Graph tags and password-reset links all address the
+ * wrong domain. The user can still override the value in the form.
+ *
+ * Includes the subfolder when the installer is not at the domain root, since
+ * APP_URL is the site's full public root.
+ */
+function detect_app_url()
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+          || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+          || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+
+    $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+    // Host is echoed back into a form field, so strip anything that is not a
+    // plausible hostname:port rather than trusting the header.
+    if (!preg_match('/^[A-Za-z0-9.\-]+(:[0-9]{1,5})?$/', $host)) {
+        $host = 'localhost';
+    }
+
+    $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
+    $dir = ($dir === '/' || $dir === '.') ? '' : rtrim($dir, '/');
+    if ($dir !== '' && !preg_match('#^(/[A-Za-z0-9._~-]+)+$#', $dir)) {
+        $dir = '';
+    }
+
+    return ($https ? 'https://' : 'http://') . $host . $dir;
+}
 /* ------------------------------------------------------------------ *
  * Handle the install submission.
  * ------------------------------------------------------------------ */
@@ -84,7 +115,7 @@ $errors = array();
 $done = false;
 $old = array(
     'app_name' => 'PlugPHP',
-    'app_url'  => 'http://127.0.0.1:8000',
+    'app_url'  => detect_app_url(),
     'db_host'  => '127.0.0.1',
     'db_name'  => '',
     'db_user'  => '',
@@ -154,6 +185,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 'APP_ENV'   => $isLocal ? 'local' : 'production',
                 'APP_DEBUG' => $isLocal ? 'true' : 'false',
                 'APP_URL'   => rtrim($old['app_url'], '/'),
+                // Always written off: HSTS before the SSL cert exists makes the
+                // site unreachable. The owner turns it on once https:// works.
+                'FORCE_HSTS' => 'false',
                 'DB_HOST'   => $old['db_host'] !== '' ? $old['db_host'] : '127.0.0.1',
                 'DB_NAME'   => $old['db_name'],
                 'DB_USER'   => $old['db_user'],
@@ -166,13 +200,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             require_once ROOT . '/core/Auth.php';
             require_once ROOT . '/core/Mailer.php';
             require_once ROOT . '/core/View.php';
+            require_once ROOT . '/core/Url.php';
             require_once ROOT . '/core/Router.php';
             require_once ROOT . '/core/Module.php';
             require_once ROOT . '/core/Settings.php';
 
             Config::load(ENV_FILE);
 
-            // Core migration first, then each selected module's migrations in order.
+            // Core migrations first, then each selected module's migrations in order.
+            // The migrations log must exist before anything else so every
+            // migration below is recorded and never re-applied on a retry.
+            Database::runMigrationFile(ROOT . '/core/migrations/000_create_migrations_log.sql');
             Database::runMigrationFile(ROOT . '/core/migrations/000_create_site_settings.sql');
             foreach ($modules as $moduleName) {
                 $class = module_class($moduleName);

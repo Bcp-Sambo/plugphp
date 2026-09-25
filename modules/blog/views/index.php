@@ -18,10 +18,10 @@ $totalPages = $totalPages ?? 1;
     <?php else: ?>
         <div style="display:flex;flex-direction:column;gap:28px">
             <?php foreach ($posts as $p): ?>
-                <a class="blog-list__item" href="/blog/<?= e($p['slug']) ?>">
+                <a class="blog-list__item" href="<?= url('/blog/' . $p['slug']) ?>">
                     <div class="ratio ratio-16x9">
                         <?php if (!empty($p['featured_image'])): ?>
-                            <img src="<?= e($p['featured_image']) ?>" alt="<?= e($p['title']) ?>" loading="lazy">
+                            <img src="<?= asset($p['featured_image']) ?>" alt="<?= e($p['title']) ?>" loading="lazy">
                         <?php else: ?>
                             <span class="img-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>16:9</span></span>
                         <?php endif; ?>
@@ -40,13 +40,13 @@ $totalPages = $totalPages ?? 1;
         <?php if ($totalPages > 1): ?>
             <nav class="pager" aria-label="Pagination">
                 <?php if ($page > 1): ?>
-                    <a class="textlink" href="/blog?page=<?= e((string) ($page - 1)) ?>" rel="prev">&larr; Newer</a>
+                    <a class="textlink" href="<?= url('/blog?page=' . (string) ($page - 1)) ?>" rel="prev">&larr; Newer</a>
                 <?php else: ?>
                     <span class="pager__disabled">&larr; Newer</span>
                 <?php endif; ?>
                 <span class="pager__page">Page <?= e((string) $page) ?> of <?= e((string) $totalPages) ?></span>
                 <?php if ($page < $totalPages): ?>
-                    <a class="textlink" href="/blog?page=<?= e((string) ($page + 1)) ?>" rel="next">Older &rarr;</a>
+                    <a class="textlink" href="<?= url('/blog?page=' . (string) ($page + 1)) ?>" rel="next">Older &rarr;</a>
                 <?php else: ?>
                     <span class="pager__disabled">Older &rarr;</span>
                 <?php endif; ?>

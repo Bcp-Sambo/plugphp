@@ -19,7 +19,13 @@ final class View
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'");
-        if (Config::isProduction()) {
+        // HSTS is gated on an explicit opt-in flag, NOT on APP_ENV. A freshly
+        // created subdomain often has no certificate for its first minutes or
+        // hours; sending HSTS before the cert exists tells the browser to refuse
+        // plain HTTP to that host, and the site becomes unreachable with no
+        // visible error. Turn FORCE_HSTS on only once https:// is confirmed
+        // working on this exact domain.
+        if (Config::get('FORCE_HSTS', 'false') === 'true') {
             header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
         }
     }

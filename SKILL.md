@@ -16,7 +16,7 @@ read the relevant one before touching that module.
 | `/public/index.php` | **No.** Bootstrap file, not a place for feature code. |
 | `.env` | Yes, to fill in real credentials. Never commit real values to git. |
 
-## The five hard rules
+## The six hard rules
 
 1. **Never write raw SQL in a view or route file.** All database access goes
    through `Database::fetchOne()`, `fetchAll()`, `insert()`, `update()`,
@@ -41,6 +41,32 @@ read the relevant one before touching that module.
    `Auth::requireCsrf($_POST['csrf_token'] ?? null)` as its first line.**
    No exceptions, including on forms that feel "low risk" like contact forms.
 
+6. **Never write a leading-slash literal URL.** A PlugPHP site can be served
+   from a main domain, a subdomain, OR a subfolder, and `href="/blog"`
+   resolves against the domain root — so every link and asset 404s at once
+   the moment the site is not at the root. Use the helpers in `core/Url.php`:
+
+   | Context | Use | Escapes? |
+   |---|---|---|
+   | Link / form `action` in a view | `url('/blog')` | yes |
+   | Asset (CSS/JS/image) in a view | `asset('/assets/css/app.css')` | yes |
+   | Redirect, or any PHP logic | `Url::to('/admin')` | no (raw) |
+   | Canonical, Open Graph, sitemap, email link | `Url::absolute('/blog/x')` | no (raw) |
+
+   `url()`/`asset()` already apply `e()`, so do **not** wrap them in `e()`
+   again. `Url::to()`/`Url::absolute()` return raw strings for use in
+   `header('Location: ...')` and email bodies.
+
+   This applies to values too, not just literals: a URL that arrives from the
+   database or a data array still needs `url($item['url'])`, not
+   `e($item['url'])`.
+
+   **Host-header security rule:** `Url::absolute()` builds from `APP_URL` and
+   never from `$_SERVER['HTTP_HOST']`. `HTTP_HOST` is attacker-controllable.
+   A password-reset link built from it lets an attacker mail a victim a reset
+   URL pointing at a host the attacker controls, with a valid token attached.
+   Never introduce a code path that derives an emailed or canonical URL from
+   the request host.
 ## Frontend/UI expectations
 
 - Views ship as **minimal, unstyled semantic HTML placeholders** — this is

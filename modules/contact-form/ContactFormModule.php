@@ -103,7 +103,7 @@ final class ContactFormModule extends Module
 
         // Post/Redirect/Get: prevents duplicate submissions (and duplicate
         // emails) if the user refreshes the result page.
-        header('Location: /contact?sent=1');
+        header('Location: ' . Url::to('/contact?sent=1'));
         exit;
     }
 

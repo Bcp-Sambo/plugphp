@@ -10,9 +10,9 @@
         <h1>Delete this post?</h1>
     </div>
     <p>You're about to permanently delete “<strong><?= e($post['title']) ?></strong>”. This can't be undone.</p>
-    <form method="post" action="/admin/blog/<?= e((string) $post['id']) ?>/delete" class="confirm__actions">
+    <form method="post" action="<?= url('/admin/blog/' . (string) $post['id'] . '/delete') ?>" class="confirm__actions">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-        <a class="btn btn-secondary" href="/admin/blog">Cancel</a>
+        <a class="btn btn-secondary" href="<?= url('/admin/blog') ?>">Cancel</a>
         <button class="btn btn-danger" type="submit">Yes, delete</button>
     </form>
 </div>

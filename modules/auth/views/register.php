@@ -10,10 +10,10 @@ $old = $old ?? [];
 $pageTitle = 'Create an account';
 $bareLayout = true;
 $brandName = Config::get('APP_NAME', 'PlugPHP');
-$mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" height="34">';
+$mark = '<img class="brand__mark" src="' . asset('/assets/img/logo.png') . '" alt="" width="34" height="34">';
 ?>
 <div class="auth">
-    <a class="auth__brand" href="/"><?= $mark ?><span><?= e($brandName) ?></span></a>
+    <a class="auth__brand" href="<?= url('/') ?>"><?= $mark ?><span><?= e($brandName) ?></span></a>
     <div class="auth-card">
         <div style="display:flex;align-items:center;gap:8px">
             <h1>Create account</h1>
@@ -28,7 +28,7 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
             </div>
         <?php endif; ?>
 
-        <form method="post" action="/register">
+        <form method="post" action="<?= url('/register') ?>">
             <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
             <div class="field">
                 <label for="register-name">Name</label>
@@ -45,6 +45,6 @@ $mark = '<img class="brand__mark" src="/assets/img/logo.png" alt="" width="34" h
             <button class="btn btn-primary btn-block" type="submit">Create account</button>
         </form>
 
-        <p class="auth-card__foot">Have an account? <a class="textlink" href="/login">Log in</a></p>
+        <p class="auth-card__foot">Have an account? <a class="textlink" href="<?= url('/login') ?>">Log in</a></p>
     </div>
 </div>

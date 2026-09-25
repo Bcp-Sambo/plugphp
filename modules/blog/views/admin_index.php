@@ -8,7 +8,7 @@ $posts = $posts ?? [];
 $visible = $visible ?? true;
 ?>
 <div class="admin-toolbar">
-    <form method="post" action="/admin/blog/visibility">
+    <form method="post" action="<?= url('/admin/blog/visibility') ?>">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <?php if (!$visible): ?><input type="hidden" name="visible" value="1"><?php endif; ?>
         <button type="submit" class="toggle-field" aria-pressed="<?= $visible ? 'true' : 'false' ?>">
@@ -16,7 +16,7 @@ $visible = $visible ?? true;
             Show the blog on the public site
         </button>
     </form>
-    <a class="btn btn-primary btn-sm" href="/admin/blog/new">
+    <a class="btn btn-primary btn-sm" href="<?= url('/admin/blog/new') ?>">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         Add new post
     </a>
@@ -43,8 +43,8 @@ $visible = $visible ?? true;
                         <td><span class="badge <?= $published ? 'badge-published' : 'badge-draft' ?>"><?= $published ? 'Published' : 'Draft' ?></span></td>
                         <td class="td-mono"><?= e($p['updated_at'] ? date('Y-m-d', strtotime((string) $p['updated_at'])) : '') ?></td>
                         <td class="td-actions">
-                            <a href="/admin/blog/<?= e((string) $p['id']) ?>/edit">Edit</a>
-                            <a class="danger" href="/admin/blog/<?= e((string) $p['id']) ?>/delete">Delete</a>
+                            <a href="<?= url('/admin/blog/' . (string) $p['id'] . '/edit') ?>">Edit</a>
+                            <a class="danger" href="<?= url('/admin/blog/' . (string) $p['id'] . '/delete') ?>">Delete</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

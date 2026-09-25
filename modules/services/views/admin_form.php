@@ -10,9 +10,9 @@ $isEdit = isset($service['id']) && $service['id'] !== '';
 $action = $isEdit ? '/admin/services/' . rawurlencode((string) $service['id']) : '/admin/services';
 $v = fn(string $k): string => e((string) ($service[$k] ?? ''));
 ?>
-<a class="backlink" href="/admin/services">&larr; Services</a>
+<a class="backlink" href="<?= url('/admin/services') ?>">&larr; Services</a>
 
-<form method="post" action="<?= e($action) ?>" class="form-card" style="margin-top:16px">
+<form method="post" action="<?= url($action) ?>" class="form-card" style="margin-top:16px">
     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
 
     <div class="form-grid">
@@ -62,6 +62,6 @@ $v = fn(string $k): string => e((string) ($service[$k] ?? ''));
 
     <div class="form-actions">
         <button class="btn btn-primary" type="submit"><?= $isEdit ? 'Save changes' : 'Create service' ?></button>
-        <a class="btn btn-secondary" href="/admin/services">Cancel</a>
+        <a class="btn btn-secondary" href="<?= url('/admin/services') ?>">Cancel</a>
     </div>
 </form>

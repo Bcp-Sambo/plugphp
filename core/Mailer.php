@@ -48,8 +48,11 @@ final class Mailer
 
     public static function sendPasswordReset(string $toEmail, string $rawToken): bool
     {
-        $baseUrl = Config::get('APP_URL');
-        $link = "{$baseUrl}/reset-password?token=" . urlencode($rawToken);
+        // SECURITY: the host comes from APP_URL via Url::absolute(), never from
+        // $_SERVER['HTTP_HOST']. The Host header is attacker-controllable, and a
+        // reset link built from one would point the victim at a host the attacker
+        // controls, with a valid token attached.
+        $link = Url::absolute('/reset-password?token=' . urlencode($rawToken));
 
         $body = "<p>Click the link below to reset your password. This link expires in 30 minutes.</p>"
               . "<p><a href=\"" . htmlspecialchars($link, ENT_QUOTES) . "\">Reset your password</a></p>"

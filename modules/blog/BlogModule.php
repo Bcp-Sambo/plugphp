@@ -174,7 +174,7 @@ final class BlogModule extends Module
 
         Database::insert('posts', $data);
 
-        header('Location: /admin/blog');
+        header('Location: ' . Url::to('/admin/blog'));
         exit;
     }
 
@@ -231,7 +231,7 @@ final class BlogModule extends Module
 
         Database::update('posts', $data, 'id', $id);
 
-        header('Location: /admin/blog');
+        header('Location: ' . Url::to('/admin/blog'));
         exit;
     }
 
@@ -257,7 +257,7 @@ final class BlogModule extends Module
 
         Database::delete('posts', 'id', $id);
 
-        header('Location: /admin/blog');
+        header('Location: ' . Url::to('/admin/blog'));
         exit;
     }
 
@@ -268,7 +268,7 @@ final class BlogModule extends Module
 
         Settings::set('blog_visible', isset($_POST['visible']) ? '1' : '0');
 
-        header('Location: /admin/blog');
+        header('Location: ' . Url::to('/admin/blog'));
         exit;
     }
 
@@ -357,9 +357,14 @@ final class BlogModule extends Module
         }
     }
 
+    /**
+     * Absolute URL for canonical / Open Graph / JSON-LD. Delegates to
+     * Url::absolute(), which builds from APP_URL and never from the
+     * request Host header.
+     */
     private function canonical(string $path): string
     {
-        return rtrim((string) Config::get('APP_URL', ''), '/') . $path;
+        return Url::absolute($path);
     }
 
     private function excerpt(string $text, int $limit = 155): string
@@ -371,12 +376,13 @@ final class BlogModule extends Module
         return rtrim(mb_substr($text, 0, $limit - 1)) . '…';
     }
 
+    /**
+     * Absolute URL for an image or asset reference. Url::absolute() passes
+     * an already-absolute http(s) URL through untouched.
+     */
     private function absoluteUrl(string $url): string
     {
-        if (preg_match('#^https?://#i', $url)) {
-            return $url;
-        }
-        return rtrim((string) Config::get('APP_URL', ''), '/') . '/' . ltrim($url, '/');
+        return Url::absolute($url);
     }
 
     /**
