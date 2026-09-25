@@ -131,6 +131,62 @@ exists at all).
   module's own dashboard settings screen — not a separate global
   "site settings" module.
 
+## Auto-update boundaries
+
+A site owner can apply a PlugPHP update from `/admin/updates`. That update has
+write access to `core/`, so what it may and may not touch is a hard boundary,
+not a convention. `core/Updater.php` enforces it on the installer side and
+`tools/build-release.php` enforces it again when a release is packaged — a
+package containing anything outside the list is rejected whole.
+
+**Safe to overwrite — infrastructure, never hand-edited by a site's developer:**
+
+- `core/*.php`
+- `core/migrations/*.sql`
+- `modules/*/[Name]Module.php`
+- `modules/*/routes.php`
+- `modules/*/migrations/*.sql`
+- `public/index.php`
+
+**Never touched by an update, under any circumstance:**
+
+- `modules/*/views/*` — the developer's UI work
+- `resources/layout.php`, `resources/404.php` — branding and styling
+- `.env` — site-specific secrets and configuration
+- `config/modules.php` — the site's enabled-module list
+- `public/.htaccess` and the root `.htaccess` — may carry custom redirects or
+  headers. If a patch needs an `.htaccess` change it is surfaced as a manual
+  diff for the owner to review, never applied automatically.
+- `vendor/` — dependency updates are a manual reupload. Auto-update cannot
+  ship a patched PHPMailer; that is a deliberate trade for a narrow blast
+  radius, and it means a dependency CVE needs a full redownload of the kit.
+
+**What this means when you build something:**
+
+- Anything a developer is expected to restyle belongs in `views/` or
+  `resources/`. Put it anywhere else and an update will overwrite their work.
+- Anything that must survive an update — a site's own setting, a toggle, a
+  piece of owner-entered content — belongs in the database via `Settings`, not
+  in a file under `core/` or `modules/*/`.
+- Do not widen the safe list. It is the entire safety guarantee of the feature.
+
+`core/` is not a module, but additions to it (`Updater.php`, `Url.php`,
+`Settings.php`) follow the same conventions as the rest of `core/`: final
+classes, static methods, no raw SQL outside `Database.php`, and one choke
+point per concern rather than a helper scattered across modules.
+
+## Migrations
+
+Every migration runs through `Database::runMigrationFile()`, which records it
+in `migrations_log` and skips anything already applied. Migrations are keyed by
+their path relative to the project root, so two modules may both ship an
+`001_create_items.sql` without colliding.
+
+Migrations are **forward-only**. A rollback restores code files but never
+reverses schema changes — undoing an `ALTER TABLE` would destroy data. Write
+migrations so that older code tolerates the newer schema: add columns as
+nullable or with defaults, and never rename or drop a column that shipped
+code still reads.
 ## If you're not sure
 
 Say so, and ask, rather than improvising a workaround — especially for

@@ -22,3 +22,8 @@
 .DS_Store
 Thumbs.db
 *.swp
+
+# Update machinery working directories (created at runtime, never committed)
+/storage/update-tmp/
+/storage/backups/
+/dist/

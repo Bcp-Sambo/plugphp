@@ -40,7 +40,9 @@ class ComposerStaticInit69e8f872f318267b10d83bb69099afc6
         'PHPMailer\\PHPMailer\\SMTP' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/SMTP.php',
         'Router' => __DIR__ . '/../..' . '/core/Router.php',
         'Settings' => __DIR__ . '/../..' . '/core/Settings.php',
+        'Updater' => __DIR__ . '/../..' . '/core/Updater.php',
         'Upload' => __DIR__ . '/../..' . '/core/Upload.php',
+        'Url' => __DIR__ . '/../..' . '/core/Url.php',
         'View' => __DIR__ . '/../..' . '/core/View.php',
     );
 

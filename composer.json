@@ -1,6 +1,6 @@
 {
     "name": "kabirusambo/plugphp",
-    "description": "PlugPHP — a modular, agent-ready vanilla-PHP starter kit for shared/cPanel hosting.",
+    "description": "PlugPHP \u2014 a modular, agent-ready vanilla-PHP starter kit for shared/cPanel hosting.",
     "type": "project",
     "license": "GPL-3.0-or-later",
     "authors": [
@@ -11,6 +11,9 @@
     ],
     "require": {
         "php": ">=8.0",
+        "ext-zip": "*",
+        "ext-pdo": "*",
+        "ext-mbstring": "*",
         "phpmailer/phpmailer": "^6.9"
     },
     "autoload": {

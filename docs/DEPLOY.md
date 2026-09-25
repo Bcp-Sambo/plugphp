@@ -253,6 +253,55 @@ tags, sitemap entries and password-reset links are built from.
 
 ---
 
+## 5b. Keeping the site updated
+
+Once live, PlugPHP can update itself from **admin → Updates**. Nothing is ever
+applied automatically: there is no cron entry point, and every update is an
+explicit click.
+
+**What an update changes.** PlugPHP's own code only — `core/`, each module's
+logic and routes, new migrations, and `public/index.php`. It never touches your
+page designs (`resources/` and each module's `views/`), your `.env`, your
+enabled-module list, or your `.htaccess` files. A package containing anything
+outside that set is rejected whole rather than partially applied.
+
+**What happens when you click Update.**
+
+1. Checks this host can take an update — writable files, the `zip` extension,
+   a way to download, free disk space. If any check fails nothing is
+   downloaded.
+2. Downloads the package and verifies it against the SHA-256 the update server
+   published. A mismatch aborts unconditionally and deletes the download; no
+   retry bypasses it.
+3. Confirms every path in the package is one an update may modify.
+4. Backs up the current version of each file about to change.
+5. Applies the files, then runs any new migrations.
+
+If a file cannot be written partway through, the update stops and restores the
+backup automatically.
+
+**Rolling back.** For 7 days after an update a Roll back button restores the
+previous code files. Database changes are *not* reversed — migrations only move
+forward, and undoing them would destroy data. New columns simply go unused.
+
+**Two things the updater cannot do for you**, both of which appear in a
+release's notes when they apply:
+
+- **Change a view or `resources/layout.php`.** Those are your design work, so
+  an update will never overwrite them. If a release improves a shipped view,
+  the notes describe the change for you to apply by hand.
+- **Update `vendor/`.** Dependency fixes — a PHPMailer security release, say —
+  need a full manual redownload of the kit.
+
+**If the panel reports a version mismatch**, an update applied its files but
+did not finish its database changes. The Finish the interrupted update button
+runs only the outstanding migrations; it downloads nothing.
+
+**Backups** live in `storage/backups/`, capped at the 3 most recent. They are
+not a substitute for your host's backups — take a full backup before a major
+update.
+
+---
 ## 6. Performance (optional, from the PRD)
 
 - [ ] Put the site behind Cloudflare's free tier (CDN + caching) once it's live.

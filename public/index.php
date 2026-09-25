@@ -17,6 +17,7 @@ require_once __DIR__ . '/../core/Url.php';   // after View.php: url()/asset() bu
 require_once __DIR__ . '/../core/Router.php';
 require_once __DIR__ . '/../core/Module.php';
 require_once __DIR__ . '/../core/Settings.php';
+require_once __DIR__ . '/../core/Updater.php';
 
 Config::load(__DIR__ . '/../.env');
 

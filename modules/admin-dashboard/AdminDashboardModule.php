@@ -111,6 +111,38 @@ final class AdminDashboardModule extends Module
      * Keeping the guard visible at the handler, not hidden here, is
      * deliberate: it is the single most damaging thing to get wrong.
      */
+    /**
+     * The /admin/updates panel.
+     *
+     * @param array{success:bool,log:string[],version?:?string}|null $result
+     *        Outcome of an apply or rollback that just ran, if any.
+     * @param bool $forceCheck Contact the update server even though a page
+     *        view alone should not (see below).
+     */
+    public static function updatesPage(?array $result = null, bool $forceCheck = false): void
+    {
+        // A plain page view does NOT phone home. Opening the dashboard should
+        // not depend on a remote host being up, and should not emit a network
+        // request the owner did not ask for. The check runs on an explicit
+        // click, or implicitly right after an update so the page can confirm
+        // the new version took.
+        $manifest = ($forceCheck || $result !== null) ? Updater::fetchManifest() : null;
+        $checkFailed = ($forceCheck || $result !== null) && $manifest === null;
+
+        self::renderAdmin(__DIR__ . '/views/updates.php', [
+            'currentVersion'   => Updater::VERSION,
+            'recordedVersion'  => Updater::installedVersion(),
+            'versionsAgree'    => Updater::versionsAgree(),
+            'manifest'         => $manifest,
+            'checkFailed'      => $checkFailed,
+            'updateAvailable'  => $manifest !== null && Updater::isNewer($manifest),
+            'preflight'        => Updater::preflight(),
+            'rollbackOffered'  => Updater::rollbackAvailable(),
+            'lastUpdatedAt'    => Updater::lastUpdatedAt(),
+            'rollbackWindow'   => Updater::ROLLBACK_WINDOW_DAYS,
+            'result'           => $result,
+        ], 'Updates');
+    }
     public static function renderAdmin(string $viewPath, array $data = [], string $pageTitle = 'Admin'): void
     {
         if (!file_exists($viewPath)) {
@@ -155,6 +187,9 @@ final class AdminDashboardModule extends Module
                 $items[] = $item;
             }
         }
+
+        // Updates last: it is site maintenance, not content.
+        $items[] = ['label' => 'Updates', 'url' => '/admin/updates'];
 
         return $items;
     }

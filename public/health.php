@@ -121,6 +121,7 @@ check('HTTPS', $isHttps ? 'PASS' : 'WARN',
  * Load core. Needed for checks 6, 8 and 9.
  * ------------------------------------------------------------------ */
 $coreLoaded = false;
+$dbOk = false;
 $envPresent = is_file(ROOT . '/.env');
 if ($envPresent) {
     try {
@@ -128,6 +129,8 @@ if ($envPresent) {
         require_once ROOT . '/core/Database.php';
         require_once ROOT . '/core/View.php';
         require_once ROOT . '/core/Url.php';
+        require_once ROOT . '/core/Settings.php';
+        require_once ROOT . '/core/Updater.php';
         Config::load(ROOT . '/.env');
         $coreLoaded = true;
     } catch (Throwable $e) {
@@ -150,6 +153,7 @@ if (!$envPresent) {
 } else {
     try {
         Database::fetchOne('SELECT 1 AS ok');
+        $dbOk = true;
         check('Database connection', 'PASS', 'Connected to the database successfully.');
     } catch (Throwable $e) {
         // Only the driver's error CLASS is surfaced. The exception text can
@@ -215,6 +219,48 @@ if ($coreLoaded) {
             . 'include it, since APP_URL is the site\'s full public root.');
 }
 
+/* ------------------------------------------------------------------ *
+ * Update readiness.
+ *
+ * Same PASS/WARN/FAIL vocabulary, and the same never-print-a-secret rule.
+ * Shares one implementation with the /admin/updates panel so the two can
+ * never disagree about whether this host can take an update.
+ * ------------------------------------------------------------------ */
+if ($coreLoaded && class_exists('Updater')) {
+    // Wrapped, because this page's whole job is to explain a broken deploy. A
+    // check that throws would blank the page with a 500 and tell the owner
+    // nothing — the single worst outcome for a diagnostic tool.
+    try {
+        // Filesystem and extension checks only; these touch no database.
+        foreach (Updater::preflight() as $c) {
+            check('Update: ' . $c['name'], $c['status'], $c['detail'],
+                $c['status'] === 'PASS' ? '' : $c['detail']);
+        }
+
+        // The recorded version lives in site_settings, so this is only
+        // answerable when the database is actually reachable.
+        if ($dbOk) {
+            $agree = Updater::versionsAgree();
+            check('Installed version', $agree ? 'INFO' : 'WARN',
+                'PlugPHP ' . Updater::VERSION
+                . ($agree
+                    ? '.'
+                    : ' on disk, but the database records ' . Updater::installedVersion()
+                      . '. Files and schema disagree — an update may have stopped partway.'),
+                $agree ? '' : 'Open the admin dashboard -> Updates and re-run the update, '
+                    . 'or roll back if that option is still offered.');
+        } else {
+            check('Installed version', 'INFO',
+                'PlugPHP ' . Updater::VERSION . ' on disk. The recorded version could not be '
+                . 'read because the database is unreachable — fix the database connection first.');
+        }
+    } catch (Throwable $e) {
+        check('Update readiness', 'WARN',
+            'The update-readiness checks could not complete on this host.',
+            'This does not affect the rest of the page. Details were written to '
+            . 'storage/logs/ if logging is enabled.');
+    }
+}
 /* ------------------------------------------------------------------ *
  * Sensitive paths — verify the web cannot reach what it must not.
  *
