@@ -52,3 +52,20 @@ visibility toggle still belongs on that module's own admin screen, not here.
 Both pages' views live in `views/`, which the auto-updater may never write.
 A release that changes them has to say so in its notes as a manual copy step.
 
+## Roles
+
+`/admin/settings`, `/admin/updates` and `/admin/users` are **administrator
+only** — every one of their handlers calls `Auth::requireRole(Auth::ROLE_ADMIN)`
+after `Auth::requireLogin()`.
+
+`/admin` itself and `/admin/messages` are open to **both roles**. The
+dashboard home is a landing page, and answering enquiries is content work.
+
+`collectNavItems()` filters the sidebar by role, and the dashboard stat cards
+drop the Users card for an Editor. That is cosmetic — `requireRole()` is the
+enforcement — but a link that answers 403 makes the dashboard look broken.
+
+A module contributing an administrator-only nav entry should mark it
+`'admin_only' => true`, or use a URL under `/admin/settings`, `/admin/updates`
+or `/admin/users`, both of which the filter recognises.
+

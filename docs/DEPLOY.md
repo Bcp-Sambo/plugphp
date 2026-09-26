@@ -308,7 +308,51 @@ Google or Facebook hosts needed, and nothing else — a script from any other
 origin is still refused by the browser.
 
 ---
-## 5b. Keeping the site updated
+## 5b. Team access and the message inbox
+
+### Two roles
+
+**Administrator** — everything: settings, mail, tracking, updates, users, all
+content. **Editor** — content modules and the message inbox only; no access to
+settings, updates or user management.
+
+Every account that existed before roles were introduced is an administrator, so
+nothing changes on an existing site until you add someone.
+
+Add people under **admin → Users**. You set a temporary password and pass it on;
+ask them to change it via *Forgot password* once they have signed in.
+
+**You cannot remove your last administrator.** Deleting one, or demoting one to
+Editor, is refused when it would leave the site with none — that state is only
+recoverable by editing the database directly. Promote a second administrator
+first. The interface greys out both options and says why.
+
+Changing someone's role takes effect on their next click, not their next login.
+Deleting an account ends its session immediately.
+
+### The message inbox
+
+**admin → Messages** is an inbox rather than a log. Messages are `New` until
+opened, then `Read`, then `Replied` once you answer from the dashboard. Both
+roles can use it.
+
+Replying sends through the site's configured mail settings and quotes the
+original underneath. A message is only marked `Replied` when the send actually
+succeeds — if mail is misconfigured it stays unanswered and tells you why, so
+you can fix the settings and retry rather than losing track of it.
+
+### Spam
+
+The contact form carries a hidden field that real visitors never see. Anything
+that fills it is automated: the submission is discarded silently, with no row
+stored and no email sent. Combined with the existing per-IP rate limit, this
+needs no CAPTCHA and no third-party service.
+
+If you restyle the contact form, **keep that field and its attributes** — the
+notes in `modules/contact-form/SKILL.md` explain why each one matters.
+
+---
+## 5c. Keeping the site updated
 
 Once live, PlugPHP can update itself from **admin → Updates**. Nothing is ever
 applied automatically: there is no cron entry point, and every update is an

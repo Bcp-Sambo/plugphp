@@ -136,6 +136,55 @@ exists at all).
   `Module::publicNavItem()` and `Nav` drops it automatically when the
   toggle is off. See "Public navigation" below.
 
+## Roles
+
+Two roles, deliberately two. A third tier has not been needed, and adding one
+speculatively is the kind of complexity worth avoiding until it is asked for.
+
+| Role | Can |
+|---|---|
+| `Auth::ROLE_ADMIN` | Everything: Settings, Updates, user management, all content |
+| `Auth::ROLE_EDITOR` | Content modules and Messages only |
+
+```php
+Auth::requireLogin();                    // ALWAYS first
+Auth::requireRole(Auth::ROLE_ADMIN);     // then, on admin-only routes
+```
+
+`requireRole()` is called **after** `requireLogin()`, never instead of it. It
+answers 403 with a plain message rather than redirecting, the same discipline
+as `requireCsrf()`'s 419 — a redirect would hide what happened.
+
+The role is read live from the database on every request, not cached in the
+session, so a demotion takes effect immediately rather than at the user's next
+login.
+
+### THE HARD RULE: only an administrator may create a user or change a role
+
+Put `Auth::requireRole(Auth::ROLE_ADMIN)` at the top of **every** user-
+management handler, in the handler itself. Not in the route file. Not in a
+shared wrapper. Not assumed because the page it is linked from is admin-only.
+
+Creating a user and changing a role are the two actions that can grant
+administrator access. An Editor who reaches either one, once, can promote
+themselves permanently — and they already hold a valid CSRF token, so CSRF is
+no protection here. A new route that forgets the check is the whole exposure.
+
+### Never leave the last administrator removable
+
+Deleting the last admin and demoting the last admin produce exactly the same
+locked-out site, recoverable only by editing the database by hand. Both paths
+go through one shared check rather than two rules that can drift, and it is
+not scoped to "is this me" — an admin removing the *other* last admin locks
+the site out just as effectively.
+
+### Roles and the nav
+
+Routes are guarded by `requireRole()`; that is the enforcement. But also hide
+what a role cannot reach — `AdminDashboardModule::collectNavItems()` filters by
+role, and the dashboard stat cards do too. Showing an Editor a Settings link
+that answers 403 is the same defect as the public nav advertising a hidden
+module's 404.
 ## File uploads
 
 `core/Upload.php` is the only approved way to accept a file.

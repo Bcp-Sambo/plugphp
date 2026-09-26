@@ -119,6 +119,29 @@ is visible at each handler.
 
 ---
 
+### Roles
+
+```php
+Auth::ROLE_ADMIN;   Auth::ROLE_EDITOR;   Auth::ROLES;   // value => label
+
+Auth::user();                          // the current user row, or null
+Auth::role();                          // 'admin' | 'editor' | null
+Auth::isAdmin();
+Auth::requireRole(Auth::ROLE_ADMIN);   // 403 + plain message on mismatch
+```
+
+`requireRole()` goes **after** `requireLogin()`, never instead of it. See the
+"Roles" section in the root `SKILL.md` for the rule about user management.
+
+The role is read from the database per request (memoised within the request),
+not from the session, so changing someone's role takes effect on their very
+next request rather than at their next login.
+
+`requireLogin()` also confirms the user row still exists and ends the session
+if it does not — without that, a deleted account would keep working access
+until its session happened to expire.
+
+---
 ## View & `e()`
 
 `core/View.php` — renders a view file inside the shared layout and applies
