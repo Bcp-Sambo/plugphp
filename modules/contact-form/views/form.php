@@ -1,4 +1,6 @@
 <?php
+// $honeypotField is supplied by ContactFormModule::showForm().
+$honeypotField = $honeypotField ?? 'website';
 /**
  * modules/contact-form/views/form.php
  * @var array<string,string> $errors
@@ -32,6 +34,29 @@ $errIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
             <?php else: ?>
                 <form method="post" action="<?= url('/contact') ?>" novalidate style="display:flex;flex-direction:column;gap:18px">
                     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+
+                    <?php /*
+                       Bot trap. A real visitor never sees or fills this; anything
+                       that does is automated and is silently discarded.
+
+                       Hidden with CSS rather than type="hidden" on purpose —
+                       simple bots skip inputs typed hidden but still fill
+                       visually-hidden ones, so CSS catches more of them.
+
+                       tabindex/autocomplete/aria-hidden matter as much as the CSS:
+                       an off-screen input is still reachable by keyboard, still
+                       announced by a screen reader, and still autofilled by a
+                       password manager that sees a field called "website". Without
+                       them the people most likely to be silently discarded are
+                       keyboard and screen-reader users — and they would be shown a
+                       success message, so nobody would ever find out.
+                    */ ?>
+                    <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+                        <label for="contact-<?= e($honeypotField) ?>">Leave this field empty</label>
+                        <input type="text" id="contact-<?= e($honeypotField) ?>"
+                               name="<?= e($honeypotField) ?>" value=""
+                               tabindex="-1" autocomplete="off">
+                    </div>
                     <div class="field">
                         <label for="contact-name">Name</label>
                         <input class="input" type="text" id="contact-name" name="name" required value="<?= e($old['name'] ?? '') ?>">

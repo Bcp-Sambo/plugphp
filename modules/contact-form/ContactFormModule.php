@@ -68,15 +68,30 @@ final class ContactFormModule extends Module
     public function showForm(array $errors = [], array $old = []): void
     {
         View::render(__DIR__ . '/views/form.php', [
-            'errors' => $errors,
-            'old'    => $old,
-            'sent'   => isset($_GET['sent']),
+            'errors'        => $errors,
+            'old'           => $old,
+            'sent'          => isset($_GET['sent']),
+            'honeypotField' => self::HONEYPOT_FIELD,
         ]);
     }
 
     public function handleSubmit(): void
     {
         Auth::requireCsrf($_POST['csrf_token'] ?? null); // FIRST LINE — always.
+
+        // Bot check, before anything is validated or stored.
+        //
+        // The rate limit alone does not stop a bot that submits slowly and
+        // stays under the cap. This field is invisible to a human, so anything
+        // that fills it is automated.
+        //
+        // The response is a normal-looking success: a bot that is told it was
+        // rejected learns to adapt, while one that thinks it succeeded keeps
+        // wasting its time. Nothing is written and nobody is emailed.
+        if (trim((string) ($_POST[self::HONEYPOT_FIELD] ?? '')) !== '') {
+            header('Location: ' . Url::to('/contact?sent=1'));
+            exit;
+        }
 
         $name    = trim((string) ($_POST['name'] ?? ''));
         $email   = trim((string) ($_POST['email'] ?? ''));
@@ -149,7 +164,13 @@ final class ContactFormModule extends Module
      */
     private function notifyOwner(string $name, string $email, string $message): void
     {
-        $to = Config::get('CONTACT_TO') ?: Config::get('SMTP_FROM_EMAIL');
+        // CONTACT_TO is an explicit "send enquiries here" and wins when set.
+        // Otherwise fall back to the site's own from-address — via
+        // Mailer::config(), NOT Config::get(), so that an owner who changes
+        // their address in the dashboard starts receiving notifications there.
+        // Reading .env directly meant notifications kept going to the previous
+        // address indefinitely, with nothing to indicate it.
+        $to = Config::get('CONTACT_TO') ?: Mailer::config()['from_email'];
         if (!$to) {
             return; // No destination configured; the submission is still stored.
         }
@@ -163,6 +184,15 @@ final class ContactFormModule extends Module
     }
 
     // ---------- Admin ----------
+
+    /**
+     * Name of the honeypot field.
+     *
+     * Deliberately plausible rather than descriptive. Some bots look for the
+     * literal string "honeypot" and skip anything named that, so naming it
+     * honestly would defeat it.
+     */
+    private const HONEYPOT_FIELD = 'website';
 
     /** Inbox statuses, in the order a message moves through them. */
     public const STATUSES = ['new' => 'New', 'read' => 'Read', 'replied' => 'Replied'];
