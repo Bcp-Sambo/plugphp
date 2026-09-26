@@ -195,12 +195,19 @@ final class AuthModule extends Module
 
     // ---------- Admin ----------
 
+    /**
+     * Every handler below begins with requireLogin() then
+     * requireRole(ROLE_ADMIN), in the handler itself.
+     *
+     * AI AGENTS: do not move that check to a wrapper, a middleware-ish helper,
+     * or the route file alone. Creating a user and changing a role are the two
+     * actions that can grant administrator access — an Editor who reaches any
+     * of them once can promote themselves permanently. The guard belongs where
+     * it cannot be skipped by adding a new route that forgets it.
+     */
     public function adminUsers(): void
     {
-        Auth::requireLogin(); // FIRST LINE.
-        // User management is administrator-only. Without this an Editor could
-        // reach the same forms and grant themselves admin.
-        Auth::requireRole(Auth::ROLE_ADMIN);
+        self::guardAdmin();
 
         $users = Database::fetchAll(
             'SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC'
@@ -208,8 +215,201 @@ final class AuthModule extends Module
 
         AdminDashboardModule::renderAdmin(
             __DIR__ . '/views/admin_users.php',
-            ['users' => $users],
+            [
+                'users'      => $users,
+                'flash'      => self::takeFlash(),
+                'currentId'  => (string) Auth::userId(),
+                'adminCount' => self::adminCount(),
+                'minPassword'=> self::MIN_PASSWORD_LENGTH,
+            ],
             'Users'
         );
+    }
+
+    /** POST /admin/users — create a user. */
+    public function createUser(): void
+    {
+        self::guardAdmin();
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $name     = trim((string) ($_POST['name'] ?? ''));
+        $email    = trim((string) ($_POST['email'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+        $role     = (string) ($_POST['role'] ?? Auth::ROLE_EDITOR);
+
+        $errors = [];
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Enter a valid email address.';
+        }
+        if (strlen($password) < self::MIN_PASSWORD_LENGTH) {
+            $errors[] = 'Password must be at least ' . self::MIN_PASSWORD_LENGTH . ' characters.';
+        }
+        if (!array_key_exists($role, Auth::ROLES)) {
+            $errors[] = 'Unknown role.';
+        }
+
+        if ($errors === []) {
+            try {
+                Auth::register($email, $password, ['name' => $name, 'role' => $role]);
+            } catch (Throwable $e) {
+                // register() throws a clean message for a duplicate address;
+                // anything else is logged rather than shown.
+                $errors[] = str_contains($e->getMessage(), 'already exists')
+                    ? 'An account with that email already exists.'
+                    : 'The account could not be created.';
+                if (!str_contains($e->getMessage(), 'already exists')) {
+                    error_log('createUser error: ' . $e->getMessage());
+                }
+            }
+        }
+
+        self::finishUsers($errors, 'User created: ' . $email);
+    }
+
+    /** POST /admin/users/{id}/role — change a user's role. */
+    public function changeUserRole(string $id): void
+    {
+        self::guardAdmin();
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $role = (string) ($_POST['role'] ?? '');
+        $user = self::findUser($id);
+
+        if ($user === null) {
+            self::finishUsers(['That user no longer exists.'], '');
+        }
+        if (!array_key_exists($role, Auth::ROLES)) {
+            self::finishUsers(['Unknown role.'], '');
+        }
+        // Demoting the last administrator locks the site out of its own
+        // Settings, Updates and this very page, with no way back except
+        // editing the database by hand.
+        if ($role !== Auth::ROLE_ADMIN && self::isLastAdmin($user)) {
+            self::finishUsers([
+                'That is the only administrator left. Promote someone else to '
+                . 'administrator first, then change this account.',
+            ], '');
+        }
+
+        Database::update('users', ['role' => $role], 'id', $user['id']);
+
+        self::finishUsers([], $user['email'] . ' is now ' . Auth::ROLES[$role] . '.');
+    }
+
+    /** GET /admin/users/{id}/delete — confirmation step. */
+    public function confirmDeleteUser(string $id): void
+    {
+        self::guardAdmin();
+
+        $user = self::findUser($id);
+        if ($user === null) {
+            self::finishUsers(['That user no longer exists.'], '');
+        }
+
+        AdminDashboardModule::renderAdmin(
+            __DIR__ . '/views/admin_user_delete.php',
+            ['user' => $user, 'isSelf' => (string) $user['id'] === (string) Auth::userId()],
+            'Delete user'
+        );
+    }
+
+    /** POST /admin/users/{id}/delete */
+    public function deleteUser(string $id): void
+    {
+        self::guardAdmin();
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $user = self::findUser($id);
+        if ($user === null) {
+            self::finishUsers(['That user no longer exists.'], '');
+        }
+        if (self::isLastAdmin($user)) {
+            self::finishUsers([
+                'That is the only administrator left. Deleting it would lock this '
+                . 'site out of its own dashboard. Create another administrator first.',
+            ], '');
+        }
+
+        $wasSelf = (string) $user['id'] === (string) Auth::userId();
+        Database::delete('users', 'id', $user['id']);
+
+        if ($wasSelf) {
+            // An admin may delete their own account as long as another admin
+            // remains — but the session must not outlive the row.
+            Auth::logout();
+            header('Location: ' . Url::to('/login'));
+            exit;
+        }
+
+        self::finishUsers([], 'Deleted ' . $user['email'] . '.');
+    }
+
+    /* -------------------------------------------------------------- *
+     * Helpers
+     * -------------------------------------------------------------- */
+
+    private static function guardAdmin(): void
+    {
+        Auth::requireLogin();          // FIRST LINE.
+        Auth::requireRole(Auth::ROLE_ADMIN);
+    }
+
+    private static function findUser(string $id): ?array
+    {
+        if (!ctype_digit($id)) {
+            return null;
+        }
+
+        return Database::fetchOne(
+            'SELECT id, name, email, role, created_at FROM users WHERE id = :id',
+            ['id' => $id]
+        );
+    }
+
+    private static function adminCount(): int
+    {
+        $row = Database::fetchOne(
+            'SELECT COUNT(*) AS c FROM users WHERE role = :role',
+            ['role' => Auth::ROLE_ADMIN]
+        );
+
+        return (int) ($row['c'] ?? 0);
+    }
+
+    /**
+     * Is this the last remaining administrator?
+     *
+     * One check for both destructive paths. Deleting the last admin and
+     * demoting the last admin produce exactly the same locked-out site, so
+     * they share a rule rather than having two that can drift apart. It is
+     * deliberately not "is this me" — an admin deleting the *other* last
+     * admin locks the site out just as effectively.
+     */
+    private static function isLastAdmin(array $user): bool
+    {
+        return (string) $user['role'] === Auth::ROLE_ADMIN && self::adminCount() <= 1;
+    }
+
+    private static function finishUsers(array $errors, string $success): void
+    {
+        $_SESSION['pp_users_flash'] = [
+            'errors'  => $errors,
+            'success' => $errors === [] ? $success : '',
+        ];
+
+        http_response_code(302);
+        header('Location: ' . Url::to('/admin/users'));
+        exit;
+    }
+
+    private static function takeFlash(): array
+    {
+        $flash = $_SESSION['pp_users_flash'] ?? ['errors' => [], 'success' => ''];
+        unset($_SESSION['pp_users_flash']);
+
+        return [
+            'errors'  => is_array($flash['errors'] ?? null) ? $flash['errors'] : [],
+            'success' => (string) ($flash['success'] ?? ''),
+        ];
     }
 }
