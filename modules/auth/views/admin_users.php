@@ -48,13 +48,16 @@ $csrf = Auth::csrfToken();
                 <td>
                     <form method="post" action="<?= url('/admin/users/' . (string) $u['id'] . '/role') ?>" class="pp-inline">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <select name="role" onchange="this.form.submit()" <?= $isLastAdmin ? 'disabled' : '' ?>
+                        <select name="role" data-autosubmit <?= $isLastAdmin ? 'disabled' : '' ?>
                                 aria-label="Role for <?= e($u['email']) ?>">
                             <?php foreach (Auth::ROLES as $value => $label): ?>
                                 <option value="<?= e($value) ?>"<?= $u['role'] === $value ? ' selected' : '' ?>><?= e($label) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <noscript><button class="btn btn-secondary btn-sm" type="submit">Set</button></noscript>
+                        <?php /* Always rendered, not wrapped in <noscript>. The script below
+                           hides it once auto-submit is wired up — so the form works
+                           whether or not the script runs, instead of depending on it. */ ?>
+                        <button class="btn btn-secondary btn-sm" type="submit" data-hide-when-scripted<?= $isLastAdmin ? ' disabled' : '' ?>>Set</button>
                     </form>
                     <?php if ($isLastAdmin): ?>
                         <div class="pp-hint">Only administrator — promote someone else first.</div>
@@ -134,3 +137,25 @@ $csrf = Auth::csrfToken();
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 @media (max-width:640px){ .pp-row { grid-template-columns:1fr; } }
 </style>
+
+<script nonce="<?= e(View::nonce()) ?>">
+/*
+ * Submit the role form as soon as the dropdown changes, and hide the Set
+ * button that exists for the no-script case.
+ *
+ * This was an onchange="this.form.submit()" attribute, which the content
+ * security policy blocks (script-src-attr — a nonce covers <script> blocks,
+ * not handler attributes). With the Set button hidden inside <noscript> at
+ * the same time, changing a role did nothing at all in a browser.
+ */
+(function () {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hide-when-scripted]'), function (el) {
+        el.hidden = true;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('select[data-autosubmit]'), function (select) {
+        select.addEventListener('change', function () {
+            if (select.form) { select.form.submit(); }
+        });
+    });
+})();
+</script>
