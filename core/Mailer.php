@@ -49,7 +49,7 @@ final class Mailer
             'port'       => (int) (self::setting('smtp_port') ?? Config::get('SMTP_PORT', 587)),
             'user'       => self::setting('smtp_user')       ?? (string) Config::get('SMTP_USER', ''),
             'pass'       => self::password(),
-            'encryption' => self::setting('smtp_encryption') ?? (string) Config::get('SMTP_ENCRYPTION', 'tls'),
+            'encryption' => self::encryption(),
             'from_email' => self::setting('smtp_from_email') ?? (string) Config::get('SMTP_FROM_EMAIL', ''),
             'from_name'  => self::setting('smtp_from_name')  ?? (string) Config::get('SMTP_FROM_NAME', 'Website'),
         ];
@@ -81,6 +81,26 @@ final class Mailer
         $value = is_string($value) ? trim($value) : '';
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * The encryption mode PHPMailer should use: 'tls', 'ssl', or '' for none.
+     *
+     * 'none' is stored literally rather than as an empty string. An empty
+     * setting means "not configured, fall back to .env" everywhere else in
+     * this class, so storing '' for none made the choice unselectable — it
+     * silently reverted to whatever .env said.
+     */
+    private static function encryption(): string
+    {
+        $stored = self::setting('smtp_encryption');
+        if ($stored !== null) {
+            return $stored === 'none' ? '' : $stored;
+        }
+
+        $fromEnv = (string) Config::get('SMTP_ENCRYPTION', 'tls');
+
+        return $fromEnv === 'none' ? '' : $fromEnv;
     }
 
     /**
@@ -120,6 +140,12 @@ final class Mailer
             $mail->Username   = $cfg['user'];
             $mail->Password   = $cfg['pass'];
             $mail->SMTPSecure = $cfg['encryption'];
+            // PHPMailer opportunistically upgrades to STARTTLS even when
+            // SMTPSecure is empty. That is a good default against a real relay,
+            // but when the owner has explicitly chosen "None" it should be
+            // honoured — otherwise a relay that advertises STARTTLS badly makes
+            // sending fail with no way to switch it off from the dashboard.
+            $mail->SMTPAutoTLS = $cfg['encryption'] !== '';
             // PHPMailer defaults to 300s. A wrong host or a port the server
             // blocks would leave the admin watching a spinner for five minutes
             // after clicking Test; 15s is long enough for a real relay and

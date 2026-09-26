@@ -20,3 +20,11 @@ $router->post('/contact', function (): void {
 $router->get('/admin/messages', function (): void {
     $this->adminMessages();
 });
+
+$router->get('/admin/messages/{id}', function (array $params): void {
+    $this->adminMessage($params['id']);
+});
+
+$router->post('/admin/messages/{id}/reply', function (array $params): void {
+    $this->replyToMessage($params['id']);
+});

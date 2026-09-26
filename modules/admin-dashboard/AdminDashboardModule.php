@@ -251,7 +251,9 @@ final class AdminDashboardModule extends Module
         Settings::set('smtp_host', trim((string) ($_POST['smtp_host'] ?? '')));
         Settings::set('smtp_port', (string) $port);
         Settings::set('smtp_user', trim((string) ($_POST['smtp_user'] ?? '')));
-        Settings::set('smtp_encryption', $encryption === 'none' ? '' : $encryption);
+        // Stored literally, including 'none'. Writing '' would read back as
+        // "not configured" and silently fall through to the .env value.
+        Settings::set('smtp_encryption', $encryption);
         Settings::set('smtp_from_name', trim((string) ($_POST['smtp_from_name'] ?? '')));
         if ($fromEmail !== '') {
             Settings::set('smtp_from_email', $fromEmail);

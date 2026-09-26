@@ -35,7 +35,10 @@ final class ContactFormModule extends Module
 
     public function migrations(): array
     {
-        return [__DIR__ . '/migrations/001_create_contact_submissions.sql'];
+        return [
+            __DIR__ . '/migrations/001_create_contact_submissions.sql',
+            __DIR__ . '/migrations/002_add_message_status.sql',
+        ];
     }
 
     /**
@@ -161,12 +164,21 @@ final class ContactFormModule extends Module
 
     // ---------- Admin ----------
 
+    /** Inbox statuses, in the order a message moves through them. */
+    public const STATUSES = ['new' => 'New', 'read' => 'Read', 'replied' => 'Replied'];
+
+    /**
+     * /admin/messages — the inbox.
+     *
+     * Available to both roles: answering enquiries is content work, not a
+     * settings-level action, so requireLogin() alone is the right guard here.
+     */
     public function adminMessages(): void
     {
         Auth::requireLogin(); // FIRST LINE — every /admin/* handler.
 
         $messages = Database::fetchAll(
-            'SELECT id, name, email, message, ip_address, created_at
+            'SELECT id, name, email, message, status, replied_at, created_at
              FROM contact_submissions
              ORDER BY created_at DESC
              LIMIT 200'
@@ -174,8 +186,157 @@ final class ContactFormModule extends Module
 
         AdminDashboardModule::renderAdmin(
             __DIR__ . '/views/admin_messages.php',
-            ['messages' => $messages],
+            [
+                'messages' => $messages,
+                'flash'    => self::takeFlash(),
+                'unread'   => self::countByStatus('new'),
+            ],
             'Messages'
         );
+    }
+
+    /** /admin/messages/{id} — one message, with a reply box. */
+    public function adminMessage(string $id): void
+    {
+        Auth::requireLogin();
+
+        $message = self::findMessage($id);
+        if ($message === null) {
+            self::finishMessages(['That message no longer exists.'], '');
+        }
+
+        // Opening a message marks it read. Only from 'new' — a reply must not
+        // be demoted back to 'read' just because someone reopened it.
+        if ($message['status'] === 'new') {
+            Database::update('contact_submissions', ['status' => 'read'], 'id', $message['id']);
+            $message['status'] = 'read';
+        }
+
+        AdminDashboardModule::renderAdmin(
+            __DIR__ . '/views/admin_message.php',
+            ['message' => $message, 'flash' => self::takeFlash()],
+            'Message'
+        );
+    }
+
+    /** POST /admin/messages/{id}/reply */
+    public function replyToMessage(string $id): void
+    {
+        Auth::requireLogin();
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $message = self::findMessage($id);
+        if ($message === null) {
+            self::finishMessages(['That message no longer exists.'], '');
+        }
+
+        $reply = trim((string) ($_POST['reply'] ?? ''));
+        if ($reply === '') {
+            self::finishMessage($id, ['Write a reply before sending.'], '');
+        }
+        // The address came from a public form. It was validated on the way in,
+        // but re-check rather than trusting a stored value to still be sane.
+        if (!filter_var((string) $message['email'], FILTER_VALIDATE_EMAIL)) {
+            self::finishMessage($id, ['That message has no valid reply-to address.'], '');
+        }
+        if (!Mailer::isConfigured()) {
+            self::finishMessage($id, [
+                'No mail settings are configured, so the reply was not sent. '
+                . 'An administrator can set them up under Settings.',
+            ], '');
+        }
+
+        $siteName = Branding::siteName();
+        $sent = Mailer::send(
+            (string) $message['email'],
+            'Re: your message to ' . $siteName,
+            // The admin types plain text; escape it so an ampersand or an
+            // angle bracket cannot break the HTML body or inject markup.
+            '<p>' . nl2br(e($reply)) . '</p>'
+            . '<hr><p style="color:#666;font-size:13px">You wrote:</p>'
+            . '<blockquote style="color:#666;font-size:13px;border-left:3px solid #ddd;padding-left:12px">'
+            . nl2br(e((string) $message['message']))
+            . '</blockquote>'
+        );
+
+        if (!$sent) {
+            // Status deliberately unchanged: the sender did not receive this,
+            // so the inbox must not claim otherwise. The admin can retry.
+            self::finishMessage($id, [
+                'The reply could not be sent, so this message is still marked '
+                . 'as unanswered. Check the mail settings under Settings and try '
+                . 'again — the exact error was written to storage/logs/.',
+            ], '');
+        }
+
+        Database::update('contact_submissions', [
+            'admin_reply' => $reply,
+            'replied_at'  => date('Y-m-d H:i:s'),
+            'status'      => 'replied',
+        ], 'id', $message['id']);
+
+        self::finishMessage($id, [], 'Reply sent to ' . $message['email'] . '.');
+    }
+
+    /* -------------------------------------------------------------- *
+     * Helpers
+     * -------------------------------------------------------------- */
+
+    private static function findMessage(string $id): ?array
+    {
+        if (!ctype_digit($id)) {
+            return null;
+        }
+
+        return Database::fetchOne(
+            'SELECT id, name, email, message, ip_address, status, admin_reply, replied_at, created_at
+             FROM contact_submissions WHERE id = :id',
+            ['id' => $id]
+        );
+    }
+
+    private static function countByStatus(string $status): int
+    {
+        $row = Database::fetchOne(
+            'SELECT COUNT(*) AS c FROM contact_submissions WHERE status = :s',
+            ['s' => $status]
+        );
+
+        return (int) ($row['c'] ?? 0);
+    }
+
+    private static function finishMessages(array $errors, string $success): void
+    {
+        self::setFlash($errors, $success);
+        http_response_code(302);
+        header('Location: ' . Url::to('/admin/messages'));
+        exit;
+    }
+
+    private static function finishMessage(string $id, array $errors, string $success): void
+    {
+        self::setFlash($errors, $success);
+        http_response_code(302);
+        header('Location: ' . Url::to('/admin/messages/' . $id));
+        exit;
+    }
+
+    private static function setFlash(array $errors, string $success): void
+    {
+        $_SESSION['pp_messages_flash'] = [
+            'errors'  => $errors,
+            'success' => $errors === [] ? $success : '',
+        ];
+    }
+
+    private static function takeFlash(): array
+    {
+        $flash = $_SESSION['pp_messages_flash'] ?? ['errors' => [], 'success' => ''];
+        unset($_SESSION['pp_messages_flash']);
+
+        return [
+            'errors'  => is_array($flash['errors'] ?? null) ? $flash['errors'] : [],
+            'success' => (string) ($flash['success'] ?? ''),
+        ];
     }
 }
