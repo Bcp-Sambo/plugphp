@@ -26,7 +26,7 @@ final class Updater
      * package (it lives in core/, which is overwritable), so it updates itself
      * when a package is applied.
      */
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
     /**
      * Where the update feed lives. HARDCODED ON PURPOSE — never read from
