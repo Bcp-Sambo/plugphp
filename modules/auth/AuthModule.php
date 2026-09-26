@@ -40,6 +40,7 @@ final class AuthModule extends Module
         return [
             __DIR__ . '/migrations/001_create_users.sql',
             __DIR__ . '/migrations/002_create_password_resets.sql',
+            __DIR__ . '/migrations/003_add_user_role.sql',
         ];
     }
 
@@ -197,9 +198,12 @@ final class AuthModule extends Module
     public function adminUsers(): void
     {
         Auth::requireLogin(); // FIRST LINE.
+        // User management is administrator-only. Without this an Editor could
+        // reach the same forms and grant themselves admin.
+        Auth::requireRole(Auth::ROLE_ADMIN);
 
         $users = Database::fetchAll(
-            'SELECT id, name, email, created_at FROM users ORDER BY created_at DESC'
+            'SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC'
         );
 
         AdminDashboardModule::renderAdmin(

@@ -232,7 +232,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // 3) First admin user — delegated to core/Auth.php (idempotent on retry).
             $existing = Database::fetchOne('SELECT id FROM users WHERE email = :email', array('email' => $old['admin_email']));
             if ($existing === null) {
-                Auth::register($old['admin_email'], $adminPass, array('name' => $old['admin_name']));
+                // The first account is always an administrator — it is the only account
+                // that exists, so anything else would lock the site out of its own
+                // Settings and Updates immediately.
+                Auth::register($old['admin_email'], $adminPass, array(
+                    'name' => $old['admin_name'],
+                    'role' => Auth::ROLE_ADMIN,
+                ));
             }
 
             // 4) Seed the PlugPHP demo content into empty tables (WordPress-

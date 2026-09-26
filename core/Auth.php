@@ -13,9 +13,17 @@
  */
 final class Auth
 {
+    /** The two roles. Deliberately two — add a third only when one is actually needed. */
+    public const ROLE_ADMIN  = 'admin';   // full access: Settings, Updates, users, all content
+    public const ROLE_EDITOR = 'editor';  // content modules and Messages only
+    public const ROLES = [self::ROLE_ADMIN => 'Administrator', self::ROLE_EDITOR => 'Editor'];
+
     private const SESSION_USER_KEY = 'auth_user_id';
     private const RESET_TOKEN_TTL_MINUTES = 30;
     private const RESET_RATE_LIMIT_MINUTES = 5;
+
+    /** Per-request cache of the current user row. */
+    private static ?array $cachedUser = null;
 
     public static function bootSession(): void
     {
@@ -75,6 +83,7 @@ final class Auth
         self::bootSession();
         $_SESSION = [];
         session_regenerate_id(true);
+        self::$cachedUser = null;
     }
 
     public static function userId(): ?string
@@ -88,12 +97,76 @@ final class Auth
         return self::userId() !== null;
     }
 
+    /**
+     * The logged-in user's row, or null. Memoised for the request.
+     *
+     * Reads the database rather than the session on purpose: a role change or
+     * a deletion must take effect on the user's very next request, not
+     * whenever they happen to log in again.
+     */
+    public static function user(): ?array
+    {
+        $id = self::userId();
+        if ($id === null) {
+            return null;
+        }
+        if (self::$cachedUser !== null && (string) self::$cachedUser['id'] === (string) $id) {
+            return self::$cachedUser;
+        }
+
+        $row = Database::fetchOne(
+            'SELECT id, name, email, role, created_at FROM users WHERE id = :id',
+            ['id' => $id]
+        );
+
+        return self::$cachedUser = $row;
+    }
+
+    /** The current user's role, or null when not logged in / no longer exists. */
+    public static function role(): ?string
+    {
+        $user = self::user();
+
+        return $user === null ? null : (string) $user['role'];
+    }
+
+    public static function isAdmin(): bool
+    {
+        return self::role() === self::ROLE_ADMIN;
+    }
+
     public static function requireLogin(): void
     {
-        if (!self::check()) {
+        // A session id alone is not enough. If the account has since been
+        // deleted, the session would otherwise keep working until it expired,
+        // leaving a removed user with live access.
+        if (!self::check() || self::user() === null) {
+            if (self::check()) {
+                self::logout();
+            }
             http_response_code(302);
             header('Location: ' . Url::to('/login'));
             exit;
+        }
+    }
+
+    /**
+     * Require a specific role. Call AFTER requireLogin(), never instead of it.
+     *
+     * Same discipline as requireCsrf(): refuse with a status and a plain
+     * message rather than redirecting somewhere that hides what happened.
+     *
+     * AI AGENTS: every Settings, Updates and user-management route must call
+     * this. In particular, every user-management action needs
+     * requireRole(Auth::ROLE_ADMIN) in the handler itself — without it an
+     * Editor could POST to the role-change endpoint and make themselves an
+     * administrator.
+     */
+    public static function requireRole(string $role): void
+    {
+        if (self::role() !== $role) {
+            http_response_code(403);
+            exit('You do not have permission to do that. Ask an administrator if you need access.');
         }
     }
 

@@ -24,29 +24,34 @@ $router->get('/admin', function (): void {
 
 $router->get('/admin/updates', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     AdminDashboardModule::updatesPage();
 });
 
 $router->post('/admin/updates/check', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::updatesPage(null, true);
 });
 
 $router->post('/admin/updates/apply', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::updatesPage(Updater::update());
 });
 
 $router->post('/admin/updates/rollback', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::updatesPage(Updater::rollback());
 });
 
 $router->post('/admin/updates/finish', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::updatesPage(Updater::finishInterrupted());
 });
@@ -60,29 +65,34 @@ $router->post('/admin/updates/finish', function (): void {
 
 $router->get('/admin/settings', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     AdminDashboardModule::settingsPage();
 });
 
 $router->post('/admin/settings/branding', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::saveBranding();
 });
 
 $router->post('/admin/settings/smtp', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::saveSmtp();
 });
 
 $router->post('/admin/settings/test-email', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::sendTestEmail();
 });
 
 $router->post('/admin/settings/tracking', function (): void {
     Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::saveTracking();
 });

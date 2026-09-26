@@ -74,6 +74,12 @@ final class AdminDashboardModule extends Module
             if (!isset(self::STAT_SOURCES[$moduleName])) {
                 continue;
             }
+            // The Users card links to an administrator-only page; showing an
+            // Editor a card that leads to a 403 is the same defect as showing
+            // them the nav link.
+            if ($moduleName === 'auth' && !Auth::isAdmin()) {
+                continue;
+            }
             [$table, $label] = self::STAT_SOURCES[$moduleName];
             $count = self::safeCount($table);
             if ($count !== null) {
@@ -419,12 +425,44 @@ final class AdminDashboardModule extends Module
         }
 
         // Site-wide config and maintenance last, after the content sections.
-        $items[] = ['label' => 'Settings', 'url' => '/admin/settings'];
-        $items[] = ['label' => 'Updates', 'url' => '/admin/updates'];
+        $items[] = ['label' => 'Settings', 'url' => '/admin/settings', 'admin_only' => true];
+        $items[] = ['label' => 'Updates', 'url' => '/admin/updates', 'admin_only' => true];
 
-        return $items;
+        return self::filterNavByRole($items);
     }
 
+    /**
+     * Drop nav entries the current user cannot reach.
+     *
+     * Routes are guarded by Auth::requireRole() regardless — this is about not
+     * showing someone a link that will refuse them. A visible link to a 403 is
+     * the same defect as the public nav advertising a hidden module's 404.
+     *
+     * Admin-only destinations are declared two ways: an 'admin_only' flag on
+     * the item, or a URL under one of the admin-only prefixes, so a module
+     * that contributes a Settings or Users link is covered without having to
+     * know about the flag.
+     */
+    private static function filterNavByRole(array $items): array
+    {
+        if (Auth::isAdmin()) {
+            return $items;
+        }
+
+        $adminOnlyPrefixes = ['/admin/settings', '/admin/updates', '/admin/users'];
+
+        return array_values(array_filter($items, static function (array $item) use ($adminOnlyPrefixes): bool {
+            if (!empty($item['admin_only'])) {
+                return false;
+            }
+            foreach ($adminOnlyPrefixes as $prefix) {
+                if (str_starts_with((string) $item['url'], $prefix)) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
     /** The enabled-module list, same source of truth the bootstrap uses. */
     private static function enabledModules(): array
     {
