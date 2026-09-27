@@ -119,11 +119,87 @@ final class View
         include $viewPath;
         $content = ob_get_clean();
 
+        ob_start();
         if (file_exists($layout)) {
             include $layout; // layout.php echoes $content wherever the page shell needs it
         } else {
             echo $content;
         }
+
+        echo self::injectSiteWideTags((string) ob_get_clean());
+    }
+
+    /**
+     * Add the site-wide <head>/<body> tags that a layout should not have to
+     * remember: tracking snippets, favicon, default Open Graph image.
+     *
+     * WHY THIS IS DONE HERE AND NOT IN THE LAYOUT
+     *
+     * An update can never overwrite resources/layout.php — it is the site's
+     * design work. So anything the layout has to *call* is unreachable by an
+     * update: a site on an older layout keeps running current code that
+     * nothing invokes, and the feature is silently absent while the page looks
+     * completely normal. That is exactly how tracking and branding went
+     * missing on a site that had updated correctly.
+     *
+     * Injecting into the finished HTML instead means these work on ANY
+     * layout — original, restyled, or years out of date — with nothing for the
+     * site owner to do.
+     *
+     * Each tag is skipped when the page already provides its own, so a layout
+     * that does call these, or a content module that emits a per-page
+     * og:image, still wins.
+     *
+     * AI AGENTS: when adding something site-wide to <head>, add it here rather
+     * than to layout.php. A layout is not a delivery mechanism.
+     */
+    private static function injectSiteWideTags(string $html): string
+    {
+        // Only a complete document; fragments and non-HTML responses are left alone.
+        if (stripos($html, '</head>') === false) {
+            return $html;
+        }
+
+        $head = '';
+
+        if (class_exists('Branding')) {
+            $favicon = Branding::favicon();
+            if ($favicon !== null && !preg_match('/<link[^>]+rel=["\'][^"\']*icon/i', $html)) {
+                $head .= '<link rel="icon" href="' . e(Url::asset($favicon)) . '">' . "\n";
+            }
+
+            // A content module's own og:image (a post's featured image) wins.
+            $ogImage = Branding::ogImageAbsolute();
+            if ($ogImage !== null && stripos($html, 'og:image') === false) {
+                $head .= '<meta property="og:image" content="' . e($ogImage) . '">' . "\n";
+            }
+        }
+
+        $bodyTag = '';
+        if (class_exists('Tracking')) {
+            $gaSnippet = Tracking::headSnippet();
+            // A layout that still calls headSnippet() itself has already put the
+            // measurement id on the page; do not emit it twice.
+            $gaId = Tracking::gaId();
+            if ($gaSnippet !== '' && ($gaId === null || substr_count($html, $gaId) === 0)) {
+                $head .= $gaSnippet;
+            }
+
+            $fbSnippet = Tracking::bodySnippet();
+            if ($fbSnippet !== '' && stripos($html, "fbq('init'") === false) {
+                $bodyTag = $fbSnippet;
+            }
+        }
+
+        if ($head !== '') {
+            $html = preg_replace('#</head>#i', $head . '</head>', $html, 1) ?? $html;
+        }
+        if ($bodyTag !== '') {
+            // Facebook's snippet expects to sit immediately after <body>.
+            $html = preg_replace('#(<body\b[^>]*>)#i', '$1' . "\n" . $bodyTag, $html, 1) ?? $html;
+        }
+
+        return $html;
     }
 }
 

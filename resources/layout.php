@@ -15,10 +15,10 @@ $pageTitle = $pageTitle ?? $brandName;
 $metaDescription = $metaDescription ?? Branding::description();
 $headExtra = $headExtra ?? '';
 $siteLogo = Branding::logo();
-$favicon = Branding::favicon();
-// Modules emit their own og:image for a post's featured image. Only fall
-// back to the site default when the page did not provide one.
-$fallbackOgImage = str_contains($headExtra, 'og:image') ? null : Branding::ogImageAbsolute();
+// Favicon, the default Open Graph image and the tracking snippets are
+// injected by core/View.php after this layout renders — they are site-wide
+// concerns, and a layout that has to remember them is a layout that stops
+// providing them the moment it falls behind. Do not re-add them here.
 // A view may set $bareLayout = true to render without the public header/footer
 // (used for the centered auth screens). The view then owns the full chrome.
 $bareLayout = $bareLayout ?? false;
@@ -41,17 +41,9 @@ $primaryItem = Nav::primaryItem();
     <meta name="description" content="<?= e($metaDescription) ?>">
     <?php endif; ?>
     <?= $headExtra /* canonical / Open Graph / JSON-LD, pre-escaped by the module */ ?>
-    <?php if ($fallbackOgImage !== null): ?>
-    <meta property="og:image" content="<?= e($fallbackOgImage) ?>">
-    <?php endif; ?>
-    <?php if ($favicon !== null): ?>
-    <link rel="icon" href="<?= asset($favicon) ?>">
-    <?php endif; ?>
-    <?= Tracking::headSnippet() /* GA4; empty unless enabled + a valid ID is saved */ ?>
     <link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
 </head>
 <body>
-<?= Tracking::bodySnippet() /* Facebook Pixel; empty unless enabled + a valid ID is saved */ ?>
     <a class="skip-link" href="#pp-main">Skip to content</a>
 
     <?php if ($bareLayout): ?>

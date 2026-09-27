@@ -530,8 +530,9 @@ final class Updater
             'resources/layout.php' => [
                 'Nav::publicItems',
                 'Hiding a module from the dashboard no longer removes it from the '
-                . 'public menu — the links stay and lead to a 404. Dashboard branding '
-                . '(logo, favicon, share image) and the tracking pixels also do not render.',
+                . 'public menu — the links stay and lead to a 404. (Branding and the '
+                . 'tracking pixels are unaffected; core injects those regardless of '
+                . 'the layout.)',
             ],
             'modules/contact-form/views/form.php' => [
                 // The field name is rendered from a variable, so match the
