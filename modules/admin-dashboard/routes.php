@@ -96,3 +96,8 @@ $router->post('/admin/settings/tracking', function (): void {
     Auth::requireCsrf($_POST['csrf_token'] ?? null);
     AdminDashboardModule::saveTracking();
 });
+
+$router->post('/admin/views/apply', function (): void {
+    // Guards live in the handler; see AdminDashboardModule::applyView().
+    AdminDashboardModule::applyView();
+});

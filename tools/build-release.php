@@ -112,6 +112,30 @@ if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
 foreach ($include as $rel) {
     $zip->addFile("$root/$rel", $rel);
 }
+
+/* ------------------------------------------------------------------ *
+ * Reference views.
+ *
+ * Carried under a separate prefix so the installer can deliver them to
+ * storage/ without ever writing them into the project tree. The site owner
+ * applies them from the dashboard, one at a time, or ignores them.
+ *
+ * This is what stops "copy these files by hand" from meaning "go and find
+ * them yourself" — the earlier packages contained none of the views they told
+ * people to copy.
+ * ------------------------------------------------------------------ */
+$views = [];
+foreach (array_keys(Updater::requiredViews()) as $rel) {
+    if (!is_file("$root/$rel")) {
+        continue;
+    }
+    if (!Updater::isPackagedView('reference-views/' . $rel)) {
+        fwrite(STDERR, "REFUSING: $rel is not an allowed reference view.\n");
+        exit(1);
+    }
+    $zip->addFile("$root/$rel", 'reference-views/' . $rel);
+    $views[] = $rel;
+}
 if (!$zip->close()) {
     fwrite(STDERR, "Could not finalise the zip.\n");
     exit(1);
@@ -132,7 +156,7 @@ file_put_contents("$outDir/version.json",
     json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
 printf("Built %s\n", basename($zipPath));
-printf("  files   %d\n", count($include));
+printf("  files   %d code, %d reference view(s)\n", count($include), count($views));
 printf("  size    %s\n", number_format(filesize($zipPath) / 1024, 1) . ' KB');
 printf("  sha256  %s\n", $sha);
 printf("  manifest %s\n", "$outDir/version.json");

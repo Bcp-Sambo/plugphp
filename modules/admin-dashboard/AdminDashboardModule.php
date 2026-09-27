@@ -500,6 +500,7 @@ final class AdminDashboardModule extends Module
 
         try {
             $stale = Updater::staleViews();
+            $pending = Updater::pendingViews();
         } catch (Throwable $e) {
             return '';
         }
@@ -507,29 +508,97 @@ final class AdminDashboardModule extends Module
             return '';
         }
 
-        $items = '';
-        foreach ($stale as $row) {
-            $items .= '<li><code>' . e($row['file']) . '</code><br>' . e($row['effect']) . '</li>';
+        // Which of the stale files do we actually have a copy of on disk?
+        $staged = [];
+        foreach ($pending as $p) {
+            $staged[$p['file']] = true;
         }
 
+        $csrf = Auth::csrfToken();
+        $canApply = Auth::isAdmin();
+        $items = '';
+        $haveAny = false;
+
+        foreach ($stale as $row) {
+            $file = (string) $row['file'];
+            $items .= '<li><code>' . e($file) . '</code><br>' . e((string) $row['effect']);
+
+            if (isset($staged[$file])) {
+                $haveAny = true;
+                if ($canApply) {
+                    $items .= '<form method="post" action="' . url('/admin/views/apply') . '" class="pp-stale__act">'
+                        . '<input type="hidden" name="csrf_token" value="' . e($csrf) . '">'
+                        . '<input type="hidden" name="file" value="' . e($file) . '">'
+                        . '<button class="btn btn-secondary btn-sm" type="submit">Apply this file</button>'
+                        . '</form>';
+                } else {
+                    $items .= '<div class="pp-stale__act"><em>An administrator can apply this.</em></div>';
+                }
+            }
+            $items .= '</li>';
+        }
+
+        $intro = '<p>Updates never overwrite your view files, because they are yours to '
+            . 'restyle. These carry behaviour this version expects, so until they are '
+            . 'updated the features below are inactive — the site will otherwise look '
+            . 'completely normal.</p>';
+
+        $howto = $haveAny
+            ? '<p>The files are already on your server, delivered with the update. '
+              . 'Applying one keeps a copy of your current version alongside it, so a '
+              . 'customisation you did not mean to lose can be recovered.</p>'
+            : '<p>This release did not deliver replacement copies — that arrived in a '
+              . 'later version. Run an update first, then this notice will offer to '
+              . 'apply them. To do it by hand instead, take the files from the '
+              . '<strong>Source code (zip)</strong> on the release page, not the update '
+              . 'package, which deliberately contains no views.</p>';
+
         return '<div class="pp-stale" role="alert">'
-            . '<strong>' . e((string) count($stale))
-            . ' file(s) need copying from the ' . e(Updater::VERSION) . ' release.</strong>'
-            . '<p>Updates never overwrite your view files, because they are yours to '
-            . 'restyle. These ones carry behaviour that this version expects, so until '
-            . 'they are copied across the features below are inactive — the site will '
-            . 'otherwise look completely normal.</p>'
-            . '<ul>' . $items . '</ul>'
-            . '<p>Download the release, copy these paths over, and this notice disappears.</p>'
+            . '<strong>' . e((string) count($stale)) . ' file(s) are older than PlugPHP '
+            . e(Updater::VERSION) . '.</strong>'
+            . $intro . '<ul>' . $items . '</ul>' . $howto
             . '</div>'
             . '<style>'
             . '.pp-stale{background:#fdf3e0;border:1px solid #e8cf9a;color:#5c4108;'
             . 'border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:14px}'
             . '.pp-stale ul{margin:.5rem 0 .5rem 1.1rem;padding:0}'
-            . '.pp-stale li{margin-bottom:.4rem}'
+            . '.pp-stale li{margin-bottom:.7rem}'
             . '.pp-stale code{background:#f4e6c6;padding:.1rem .3rem;border-radius:4px;font-size:12.5px}'
             . '.pp-stale p{margin:.4rem 0}'
+            . '.pp-stale__act{margin-top:.35rem}'
             . '</style>';
+    }
+
+    /**
+     * POST /admin/views/apply — copy one delivered view into place.
+     *
+     * Administrator only, one file per request, with the current version kept
+     * alongside. This is the only place a view is ever written by the
+     * application, and it happens because someone asked for it by name — the
+     * update itself still never touches one.
+     */
+    public static function applyView(): void
+    {
+        Auth::requireLogin();
+        Auth::requireRole(Auth::ROLE_ADMIN);
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $result = Updater::applyPendingView((string) ($_POST['file'] ?? ''));
+
+        $_SESSION['pp_settings_flash'] = [
+            'errors'  => $result['success'] ? [] : [$result['message']],
+            'success' => $result['success'] ? $result['message'] : '',
+        ];
+
+        $back = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+        // Only follow a same-site referer; otherwise land somewhere known.
+        $target = (str_starts_with($back, '/') && !str_starts_with($back, '//'))
+            ? $back
+            : Url::to('/admin/updates');
+
+        http_response_code(302);
+        header('Location: ' . $target);
+        exit;
     }
     /** The enabled-module list, same source of truth the bootstrap uses. */
     private static function enabledModules(): array

@@ -377,6 +377,14 @@ final class Updater
             self::$appliedThisRequest = true;
             self::note('Applied ' . count($files) . ' file(s).');
 
+            // 8a. Deliver any view files this release carries. They go to
+            // storage/, not into the project — the admin applies them one at a
+            // time from the dashboard, or ignores them.
+            $stagedViews = self::stageViews($staging);
+            if ($stagedViews > 0) {
+                self::note($stagedViews . ' view file(s) delivered and waiting to be applied — see the notice on any admin page.');
+            }
+
             // 8. Migrations. Already-applied files are skipped by migrations_log.
             $ran = self::runPendingMigrations();
             self::note($ran === 0 ? 'No new migrations to run.' : 'Ran ' . $ran . ' new migration(s).');
@@ -494,37 +502,181 @@ final class Updater
     }
 
     /* ============================================================== *
+     * Staged view delivery
+     * ============================================================== */
+
+    /**
+     * Where update packages carry view files, and where they are staged.
+     *
+     * Views are shipped under a separate prefix inside the package and never
+     * written into the project tree by the updater. They land in storage/,
+     * outside the web root, and only move into place when an administrator
+     * explicitly applies one. The guarantee stays exactly as it was — an
+     * update never overwrites your design work — while the file itself stops
+     * being something you have to go and fetch.
+     */
+    private const VIEW_PACKAGE_PREFIX = 'reference-views/';
+    private const PENDING_VIEW_DIR = 'storage/pending-views';
+
+    /** True for a package path carrying a deliverable view. */
+    public static function isPackagedView(string $rel): bool
+    {
+        if (!str_starts_with($rel, self::VIEW_PACKAGE_PREFIX)) {
+            return false;
+        }
+        $view = substr($rel, strlen(self::VIEW_PACKAGE_PREFIX));
+
+        // Membership of the known set is the whole check. A path is never
+        // trusted because it "looks like" a view — traversal and surprises
+        // both fail simply by not being on the list.
+        return array_key_exists($view, self::requiredViews());
+    }
+
+    /**
+     * Views staged on disk that differ from what the site is running.
+     *
+     * @return array<int, array{file:string, effect:string, status:string, staged:string}>
+     */
+    public static function pendingViews(): array
+    {
+        $out = [];
+        $root = self::root();
+        $enabled = self::enabledModuleNames();
+
+        foreach (self::requiredViews() as $rel => [$marker, $effect]) {
+            if (preg_match('#^modules/([a-z0-9-]+)/#', $rel, $m) && !in_array($m[1], $enabled, true)) {
+                continue;
+            }
+
+            $staged = $root . '/' . self::PENDING_VIEW_DIR . '/' . $rel;
+            if (!is_file($staged)) {
+                continue;
+            }
+
+            $live = $root . '/' . $rel;
+            if (is_file($live) && @sha1_file($live) === @sha1_file($staged)) {
+                continue; // already identical, nothing to offer
+            }
+
+            $out[] = [
+                'file'   => $rel,
+                'effect' => $effect,
+                'status' => is_file($live) ? 'differs' : 'missing',
+                'staged' => self::PENDING_VIEW_DIR . '/' . $rel,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Copy one staged view into place, backing up the current file first.
+     *
+     * Called only from an authenticated, CSRF-guarded admin action, one file
+     * at a time — never as part of an update.
+     *
+     * @return array{success:bool, message:string}
+     */
+    public static function applyPendingView(string $rel): array
+    {
+        if (!array_key_exists($rel, self::requiredViews())) {
+            return ['success' => false, 'message' => 'That is not a file this release provides.'];
+        }
+
+        $root = self::root();
+        $staged = $root . '/' . self::PENDING_VIEW_DIR . '/' . $rel;
+        $live = $root . '/' . $rel;
+
+        if (!is_file($staged)) {
+            return ['success' => false, 'message' => 'No staged copy of that file is available. Run an update first.'];
+        }
+
+        $dir = dirname($live);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+            return ['success' => false, 'message' => 'Could not create ' . basename($dir) . '/.'];
+        }
+        if (is_file($live) && !is_writable($live)) {
+            return ['success' => false, 'message' => $rel . ' is not writable. Set it to 0644 owned by the account PHP runs as.'];
+        }
+        if (!is_file($live) && !is_writable($dir)) {
+            return ['success' => false, 'message' => $dir . ' is not writable.'];
+        }
+
+        // Keep the previous version alongside, so an overwritten
+        // customisation is recoverable without needing the backup zip.
+        $backedUp = '';
+        if (is_file($live)) {
+            $backedUp = $live . '.replaced-' . date('Ymd-His');
+            if (!@copy($live, $backedUp)) {
+                return ['success' => false, 'message' => 'Could not back up the current ' . $rel . ', so it was not replaced.'];
+            }
+        }
+
+        $tmp = $live . '.pp-new';
+        if (!@copy($staged, $tmp) || !@rename($tmp, $live)) {
+            @unlink($tmp);
+            return ['success' => false, 'message' => 'Could not write ' . $rel . '.'];
+        }
+        @chmod($live, 0644);
+        self::invalidateOpcache($live);
+
+        return [
+            'success' => true,
+            'message' => $rel . ' updated.'
+                . ($backedUp !== '' ? ' Your previous version was kept as ' . basename($backedUp) . '.' : ''),
+        ];
+    }
+
+    /** Move staged views out of the extracted package into storage/. */
+    private static function stageViews(string $staging): int
+    {
+        $src = $staging . '/' . rtrim(self::VIEW_PACKAGE_PREFIX, '/');
+        if (!is_dir($src)) {
+            return 0;
+        }
+
+        $base = self::root() . '/' . self::PENDING_VIEW_DIR;
+        if (!is_dir($base) && !@mkdir($base, 0755, true)) {
+            return 0;
+        }
+        self::protectDirectory($base);
+
+        $n = 0;
+        foreach (array_keys(self::requiredViews()) as $rel) {
+            $from = $src . '/' . $rel;
+            if (!is_file($from)) {
+                continue;
+            }
+            $to = $base . '/' . $rel;
+            if (!is_dir(dirname($to)) && !@mkdir(dirname($to), 0755, true)) {
+                continue;
+            }
+            if (@copy($from, $to)) {
+                @chmod($to, 0644);
+                $n++;
+            }
+        }
+
+        return $n;
+    }
+    /* ============================================================== *
      * Stale view detection
      * ============================================================== */
 
     /**
-     * View files that are older than the code now running.
+     * Views this release can deliver, each with the marker that proves a
+     * site's copy is current and a plain description of what breaks without
+     * it.
      *
-     * An update can never overwrite a view — that boundary is what protects a
-     * site's design work. The cost is that a release which moves behaviour
-     * into a view cannot deliver it, and the site carries on looking perfectly
-     * healthy while the feature is simply absent. That has now happened three
-     * times: a hidden module still listed in the menu, a contact form with no
-     * spam trap, an Update button with no confirmation. In every case the
-     * owner had no way to know.
+     * One definition, three consumers: the release tool packages these, the
+     * updater stages them, and staleViews() reports on them. Keeping it in a
+     * single place is what stops the packaged set and the checked set from
+     * drifting apart.
      *
-     * So each view that carries required wiring is paired with a marker that
-     * proves it is current. The marker is the wiring itself, not a version
-     * number, so a developer who has restyled the file completely still passes
-     * as long as they kept the functional part.
-     *
-     * This check lives in core/ and therefore DOES reach existing sites, even
-     * though the views it reports on do not.
-     *
-     * @return array<int, array{file:string, effect:string}>
+     * @return array<string, array{0:?string, 1:string}>
      */
-    public static function staleViews(): array
+    public static function requiredViews(): array
     {
-        static $cached = null;
-        if ($cached !== null) {
-            return $cached;
-        }
-
         // file => [marker that must appear, what stops working without it]
         $required = [
             'resources/layout.php' => [
@@ -568,6 +720,39 @@ final class Updater
                 'Opening a single message cannot load.',
             ],
         ];
+
+        return $required;
+    }
+
+    /**
+     * View files that are older than the code now running.
+     *
+     * An update can never overwrite a view — that boundary is what protects a
+     * site's design work. The cost is that a release which moves behaviour
+     * into a view cannot deliver it, and the site carries on looking perfectly
+     * healthy while the feature is simply absent. That has now happened three
+     * times: a hidden module still listed in the menu, a contact form with no
+     * spam trap, an Update button with no confirmation. In every case the
+     * owner had no way to know.
+     *
+     * So each view that carries required wiring is paired with a marker that
+     * proves it is current. The marker is the wiring itself, not a version
+     * number, so a developer who has restyled the file completely still passes
+     * as long as they kept the functional part.
+     *
+     * This check lives in core/ and therefore DOES reach existing sites, even
+     * though the views it reports on do not.
+     *
+     * @return array<int, array{file:string, effect:string}>
+     */
+    public static function staleViews(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $required = self::requiredViews();
 
         $enabled = self::enabledModuleNames();
         $stale = [];
@@ -750,7 +935,10 @@ final class Updater
             }
             // Validate BEFORE extracting. extractTo() on an unvalidated archive
             // is how a "../../.env" entry escapes the staging directory.
-            if (!self::isSafePath($name)) {
+            // Reference views are allowed INTO the staging directory but never
+            // into the project tree — collectStagedFiles() excludes them from
+            // the apply loop, and they are only ever copied to storage/.
+            if (!self::isSafePath($name) && !self::isPackagedView($name)) {
                 $zip->close();
                 self::rrmdir($staging);
                 self::note('Package contains a disallowed path: ' . substr($name, 0, 120));
@@ -785,9 +973,15 @@ final class Updater
         );
         foreach ($it as $f) {
             /** @var SplFileInfo $f */
-            if ($f->isFile()) {
-                $files[] = ltrim(str_replace('\\', '/', substr($f->getPathname(), strlen($staging))), '/');
+            if (!$f->isFile()) {
+                continue;
             }
+            $rel = ltrim(str_replace('\\', '/', substr($f->getPathname(), strlen($staging))), '/');
+            // Reference views are delivered to storage/, never applied.
+            if (self::isPackagedView($rel)) {
+                continue;
+            }
+            $files[] = $rel;
         }
         sort($files);
         return $files;
@@ -885,6 +1079,8 @@ final class Updater
                 @unlink($tmp);
                 return $rel;
             }
+
+            self::invalidateOpcache($dst);
         }
 
         return true;
@@ -929,6 +1125,8 @@ final class Updater
             if (@file_put_contents($tmp, $body) === false || @rename($tmp, $dst) === false) {
                 @unlink($tmp);
                 $ok = false;
+            } else {
+                self::invalidateOpcache($dst);
             }
         }
         $zip->close();
@@ -1009,6 +1207,30 @@ final class Updater
         return $ran;
     }
 
+    /**
+     * Drop a replaced file from the opcode cache.
+     *
+     * Without this an update can write every file correctly, report success,
+     * and change nothing. PHP caches compiled bytecode, and a host running
+     * opcache.validate_timestamps=0 — common on tuned shared hosting — never
+     * re-reads a file it has already compiled, so the old code keeps serving
+     * until PHP itself restarts. Even with revalidation on, the default
+     * two-second window is long enough for the admin to reload and conclude
+     * the update did not work.
+     */
+    private static function invalidateOpcache(string $path): void
+    {
+        if (!function_exists('opcache_invalidate')) {
+            return;
+        }
+        if (!str_ends_with($path, '.php')) {
+            return; // .sql migrations are read, never compiled
+        }
+
+        // force=true, because with validate_timestamps off a non-forced call
+        // is a no-op — which is exactly the configuration that needs it.
+        @opcache_invalidate($path, true);
+    }
     private static function cleanup(?string $staging, ?string $zipPath): void
     {
         if ($staging !== null && is_dir($staging)) {
