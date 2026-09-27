@@ -494,6 +494,118 @@ final class Updater
     }
 
     /* ============================================================== *
+     * Stale view detection
+     * ============================================================== */
+
+    /**
+     * View files that are older than the code now running.
+     *
+     * An update can never overwrite a view — that boundary is what protects a
+     * site's design work. The cost is that a release which moves behaviour
+     * into a view cannot deliver it, and the site carries on looking perfectly
+     * healthy while the feature is simply absent. That has now happened three
+     * times: a hidden module still listed in the menu, a contact form with no
+     * spam trap, an Update button with no confirmation. In every case the
+     * owner had no way to know.
+     *
+     * So each view that carries required wiring is paired with a marker that
+     * proves it is current. The marker is the wiring itself, not a version
+     * number, so a developer who has restyled the file completely still passes
+     * as long as they kept the functional part.
+     *
+     * This check lives in core/ and therefore DOES reach existing sites, even
+     * though the views it reports on do not.
+     *
+     * @return array<int, array{file:string, effect:string}>
+     */
+    public static function staleViews(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        // file => [marker that must appear, what stops working without it]
+        $required = [
+            'resources/layout.php' => [
+                'Nav::publicItems',
+                'Hiding a module from the dashboard no longer removes it from the '
+                . 'public menu — the links stay and lead to a 404. Dashboard branding '
+                . '(logo, favicon, share image) and the tracking pixels also do not render.',
+            ],
+            'modules/contact-form/views/form.php' => [
+                // The field name is rendered from a variable, so match the
+                // wiring rather than the literal attribute value.
+                '$honeypotField',
+                'The contact form has no spam trap. Submissions still work, but the '
+                . 'bot check has no field to catch anything with.',
+            ],
+            'modules/admin-dashboard/views/updates.php' => [
+                'data-confirm',
+                'Update and Roll back run immediately with no confirmation prompt, and '
+                . 'give no progress feedback while they work.',
+            ],
+            'modules/auth/views/admin_users.php' => [
+                'data-autosubmit',
+                'Changing a user role from the dropdown does nothing.',
+            ],
+            'modules/contact-form/views/admin_messages.php' => [
+                'pp-badge',
+                'The message inbox does not show read/replied status.',
+            ],
+            // Files that simply have to exist; absent means the page errors.
+            'modules/admin-dashboard/views/settings.php' => [
+                null,
+                'The Settings page cannot load.',
+            ],
+            'modules/auth/views/admin_user_delete.php' => [
+                null,
+                'Deleting a user cannot load its confirmation step.',
+            ],
+            'modules/contact-form/views/admin_message.php' => [
+                null,
+                'Opening a single message cannot load.',
+            ],
+        ];
+
+        $enabled = self::enabledModuleNames();
+        $stale = [];
+
+        foreach ($required as $rel => [$marker, $effect]) {
+            // Skip views belonging to a module this site has not installed.
+            if (preg_match('#^modules/([a-z0-9-]+)/#', $rel, $m) && !in_array($m[1], $enabled, true)) {
+                continue;
+            }
+
+            $path = self::root() . '/' . $rel;
+            if (!is_file($path)) {
+                $stale[] = ['file' => $rel, 'effect' => $effect];
+                continue;
+            }
+            if ($marker === null) {
+                continue; // existence was the whole requirement
+            }
+
+            $contents = @file_get_contents($path);
+            if ($contents === false || !str_contains($contents, $marker)) {
+                $stale[] = ['file' => $rel, 'effect' => $effect];
+            }
+        }
+
+        return $cached = $stale;
+    }
+
+    private static function enabledModuleNames(): array
+    {
+        $path = self::root() . '/config/modules.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        $modules = require $path;
+
+        return is_array($modules) ? $modules : [];
+    }
+    /* ============================================================== *
      * Internals
      * ============================================================== */
 

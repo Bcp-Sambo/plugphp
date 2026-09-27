@@ -394,6 +394,12 @@ final class AdminDashboardModule extends Module
         include $viewPath;
         $content = ob_get_clean();
 
+        // Prepended here rather than added to a view on purpose: this file
+        // ships with an update, the views do not. A site whose views are stale
+        // is exactly the site that will never receive a warning written into a
+        // view, so the warning has to come from code that can reach it.
+        $content = self::staleViewNotice() . $content;
+
         include __DIR__ . '/views/layout.php';
     }
 
@@ -464,6 +470,53 @@ final class AdminDashboardModule extends Module
             }
             return true;
         }));
+    }
+    /**
+     * Banner shown on every admin page when view files are older than the code.
+     *
+     * Updates never overwrite views, so a release that moves behaviour into one
+     * cannot deliver it — and the site keeps looking healthy while the feature
+     * is quietly absent. This turns that silence into something the owner can
+     * see and act on.
+     */
+    private static function staleViewNotice(): string
+    {
+        if (!class_exists('Updater')) {
+            return '';
+        }
+
+        try {
+            $stale = Updater::staleViews();
+        } catch (Throwable $e) {
+            return '';
+        }
+        if ($stale === []) {
+            return '';
+        }
+
+        $items = '';
+        foreach ($stale as $row) {
+            $items .= '<li><code>' . e($row['file']) . '</code><br>' . e($row['effect']) . '</li>';
+        }
+
+        return '<div class="pp-stale" role="alert">'
+            . '<strong>' . e((string) count($stale))
+            . ' file(s) need copying from the ' . e(Updater::VERSION) . ' release.</strong>'
+            . '<p>Updates never overwrite your view files, because they are yours to '
+            . 'restyle. These ones carry behaviour that this version expects, so until '
+            . 'they are copied across the features below are inactive — the site will '
+            . 'otherwise look completely normal.</p>'
+            . '<ul>' . $items . '</ul>'
+            . '<p>Download the release, copy these paths over, and this notice disappears.</p>'
+            . '</div>'
+            . '<style>'
+            . '.pp-stale{background:#fdf3e0;border:1px solid #e8cf9a;color:#5c4108;'
+            . 'border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:14px}'
+            . '.pp-stale ul{margin:.5rem 0 .5rem 1.1rem;padding:0}'
+            . '.pp-stale li{margin-bottom:.4rem}'
+            . '.pp-stale code{background:#f4e6c6;padding:.1rem .3rem;border-radius:4px;font-size:12.5px}'
+            . '.pp-stale p{margin:.4rem 0}'
+            . '</style>';
     }
     /** The enabled-module list, same source of truth the bootstrap uses. */
     private static function enabledModules(): array
