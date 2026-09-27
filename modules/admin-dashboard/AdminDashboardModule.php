@@ -135,13 +135,26 @@ final class AdminDashboardModule extends Module
         $manifest = ($forceCheck || $result !== null) ? Updater::fetchManifest() : null;
         $checkFailed = ($forceCheck || $result !== null) && $manifest === null;
 
+        // An update that just succeeded in THIS request is a special case.
+        // Updater::VERSION is a compile-time constant, so the value in memory
+        // is still the old one even though apply() has already replaced the
+        // file on disk. Reading it here would report the freshly updated site
+        // as "files and database disagree" and offer to finish an interrupted
+        // update — a false alarm at the single worst moment, right after the
+        // owner watched the update report success. The next request reads the
+        // new constant and is correct; this just stops the one page in between
+        // from contradicting the log directly above it.
+        $justUpdatedTo = ($result !== null && !empty($result['success']) && !empty($result['version']))
+            ? (string) $result['version']
+            : null;
+
         self::renderAdmin(__DIR__ . '/views/updates.php', [
-            'currentVersion'   => Updater::VERSION,
+            'currentVersion'   => $justUpdatedTo ?? Updater::VERSION,
             'recordedVersion'  => Updater::installedVersion(),
-            'versionsAgree'    => Updater::versionsAgree(),
+            'versionsAgree'    => $justUpdatedTo !== null || Updater::versionsAgree(),
             'manifest'         => $manifest,
             'checkFailed'      => $checkFailed,
-            'updateAvailable'  => $manifest !== null && Updater::isNewer($manifest),
+            'updateAvailable'  => $justUpdatedTo === null && $manifest !== null && Updater::isNewer($manifest),
             'preflight'        => Updater::preflight(),
             'rollbackOffered'  => Updater::rollbackAvailable(),
             'lastUpdatedAt'    => Updater::lastUpdatedAt(),
