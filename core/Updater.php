@@ -518,6 +518,58 @@ final class Updater
     private const VIEW_PACKAGE_PREFIX = 'reference-views/';
     private const PENDING_VIEW_DIR = 'storage/pending-views';
 
+    /**
+     * Files an update delivers as reference copies rather than installing.
+     *
+     * The rule is: everything the updater may not write, EXCEPT
+     *
+     *  - site identity — their logo, their .env, their enabled-module list,
+     *    their uploaded files. Replacing any of these would be replacing the
+     *    site. One exception sits inside public/uploads/: the .htaccess there
+     *    is hardening this project ships, not content the owner owns, and it
+     *    carries the fix for uploads returning 500 on mod_php hosts.
+     *  - files that are meant to be ABSENT — install.php and health.php are
+     *    deleted after use, so offering to restore them would put a setup tool
+     *    back onto a live server.
+     *  - install-time only — sample content is read once by the installer and
+     *    never again.
+     *  - documentation and build tooling — nothing to apply.
+     *
+     * What is left is the set a running site actually executes and might be
+     * behind on: every view, every .htaccess, and the stylesheet.
+     */
+    private const REFERENCE_EXCLUDE = '#^('
+        . 'config/modules\.php|\.env|\.env\.example|\.gitignore|\.github/|tools/'
+        . '|composer\.(json|lock)|public/uploads/(?!\.htaccess$)|public/assets/img/'
+        . '|public/install\.php|public/health\.php|resources/sample-content\.php'
+        . '|LICENSE|README\.md|docs/|.*SKILL\.md'
+        . ')#';
+
+    /**
+     * Is this project-relative path one an update delivers as a reference copy?
+     *
+     * Deliberately a rule rather than a hand-written list: a list is only as
+     * current as whoever remembered to add to it, and forgetting one entry is
+     * exactly how a feature goes silently missing.
+     */
+    public static function isReferenceFile(string $rel): bool
+    {
+        $rel = str_replace('\\', '/', $rel);
+        if ($rel === '' || str_starts_with($rel, '/') || str_contains($rel, '..')) {
+            return false;
+        }
+        if (self::isSafePath($rel)) {
+            return false; // installed directly, not delivered
+        }
+        if (preg_match(self::REFERENCE_EXCLUDE, $rel)) {
+            return false;
+        }
+
+        // Only the kinds of file this project actually ships in that set.
+        return (bool) preg_match('#(\.php|\.css|\.htaccess)$#', $rel)
+            || str_ends_with($rel, '/.htaccess');
+    }
+
     /** True for a package path carrying a deliverable view. */
     public static function isPackagedView(string $rel): bool
     {

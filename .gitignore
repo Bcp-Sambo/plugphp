@@ -27,3 +27,6 @@ Thumbs.db
 /storage/update-tmp/
 /storage/backups/
 /dist/
+
+# Local working notes (not part of the template)
+/NEXT-SESSION.md
