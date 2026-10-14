@@ -308,10 +308,19 @@ final class Http
             },
         ];
 
-        // CURLOPT_PROTOCOLS_STR arrived in PHP 8.2; composer.json allows 8.0.
-        // Referencing an undefined constant is a fatal Error, so each form is
-        // used only where it exists — and CURLOPT_PROTOCOLS is deprecated in
-        // 8.4, which is why the newer one is preferred when available.
+        // Restrict the transfer to https, by whichever name this build knows.
+        //
+        // Tested with defined() rather than a PHP version check, because
+        // availability is two conditions: CURLOPT_PROTOCOLS_STR arrived in
+        // PHP 8.3 AND is compiled in only when PHP was built against libcurl
+        // 7.85.0 or newer, so a site on 8.3 with an older system libcurl
+        // would pass a version test and still hit a fatal Error on an
+        // undefined constant. composer.json allows PHP 8.0.
+        //
+        // The older CURLOPT_PROTOCOLS is deprecated by libcurl, which is why
+        // the newer form is preferred where it exists; PHP itself still
+        // defines and honours it, so it remains the fallback. No redirect
+        // counterpart is set because this class never follows a redirect.
         if (defined('CURLOPT_PROTOCOLS_STR')) {
             $options[CURLOPT_PROTOCOLS_STR] = 'https';
         } elseif (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {

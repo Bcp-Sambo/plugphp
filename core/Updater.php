@@ -1457,17 +1457,52 @@ final class Updater
 
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
-            curl_setopt_array($ch, [
+
+            $options = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_MAXREDIRS      => 5,
                 CURLOPT_TIMEOUT        => self::DOWNLOAD_TIMEOUT,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 2,
-                CURLOPT_PROTOCOLS_STR  => 'https',
-                CURLOPT_REDIR_PROTOCOLS_STR => 'https',
                 CURLOPT_USERAGENT      => 'PlugPHP-Updater/' . self::VERSION,
-            ]);
+            ];
+
+            // Restrict the transfer to https, by whichever name this build
+            // knows. Tested with defined() rather than a PHP version check,
+            // because availability is TWO conditions, not one:
+            // CURLOPT_PROTOCOLS_STR arrived in PHP 8.3 AND is compiled in only
+            // when PHP was built against libcurl 7.85.0 or newer. A site on
+            // PHP 8.3 with an older system libcurl would pass a version test
+            // and still die here.
+            //
+            // Dying is the point: referencing an undefined constant is a fatal
+            // Error, and these options used to be set unconditionally — so on
+            // PHP 8.0, 8.1 or 8.2 this method killed the request instead of
+            // answering it. That is the update check itself, which is the one
+            // screen a site owner uses to receive security patches.
+            //
+            // The older CURLOPT_PROTOCOLS is deprecated by libcurl (7.85.0) in
+            // favour of the _STR form, though PHP itself still defines and
+            // honours it — so it stays as the fallback, and the newer form is
+            // preferred wherever it exists.
+            if (defined('CURLOPT_PROTOCOLS_STR') && defined('CURLOPT_REDIR_PROTOCOLS_STR')) {
+                $options[CURLOPT_PROTOCOLS_STR] = 'https';
+                $options[CURLOPT_REDIR_PROTOCOLS_STR] = 'https';
+            } elseif (
+                defined('CURLOPT_PROTOCOLS')
+                && defined('CURLOPT_REDIR_PROTOCOLS')
+                && defined('CURLPROTO_HTTPS')
+            ) {
+                $options[CURLOPT_PROTOCOLS] = CURLPROTO_HTTPS;
+                $options[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTPS;
+            }
+            // Neither defined is not a hole: the https:// check above already
+            // refused anything else, and CURLOPT_FOLLOWLOCATION is bounded by
+            // MAXREDIRS. This option is defence in depth against a redirect
+            // to another scheme, not the only thing enforcing https.
+
+            curl_setopt_array($ch, $options);
             $body = curl_exec($ch);
             $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
             // No curl_close(): it is a no-op from PHP 8.0 (the handle is freed
