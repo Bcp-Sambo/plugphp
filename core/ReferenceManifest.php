@@ -9,7 +9,7 @@
  */
 
 return [
-    'version' => '1.6.0',
+    'version' => '1.7.0',
     'files' => [
         '.htaccess' => '1a2d7df4d9a36980533c16c8321b9641caf3d916',
         'config/.htaccess' => 'fd28901bbae28ba4e808f281fe11848730378143',
