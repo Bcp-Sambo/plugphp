@@ -208,6 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             require_once ROOT . '/core/Router.php';
             require_once ROOT . '/core/Module.php';
             require_once ROOT . '/core/Settings.php';
+            // Needed for the fingerprint baseline written at step 6.
+            require_once ROOT . '/core/Updater.php';
 
             Config::load(ENV_FILE);
 
@@ -248,7 +250,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // 5) Persist the enabled module list.
             write_modules(MODULES_FILE, $modules);
 
-            // 6) Lock — marks the install complete; delete it to re-run.
+            // 6) Record the shipped file fingerprints as this site's baseline.
+            //    Written now, while every file is still exactly as delivered, so
+            //    that any later difference is known to be the owner's own change
+            //    rather than something that might always have been there.
+            if (class_exists('Updater')) {
+                Updater::seedBaseline();
+            }
+
+            // 7) Lock — marks the install complete; delete it to re-run.
             file_put_contents(LOCK_FILE, 'Installed ' . gmdate('c') . "\n");
 
             $done = true;

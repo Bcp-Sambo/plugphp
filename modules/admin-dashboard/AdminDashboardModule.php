@@ -499,72 +499,123 @@ final class AdminDashboardModule extends Module
         }
 
         try {
-            $stale = Updater::staleViews();
-            $pending = Updater::pendingViews();
+            $rows = Updater::referenceStatus();
         } catch (Throwable $e) {
             return '';
         }
-        if ($stale === []) {
+        if ($rows === []) {
             return '';
         }
 
-        // Which of the stale files do we actually have a copy of on disk?
-        $staged = [];
-        foreach ($pending as $p) {
-            $staged[$p['file']] = true;
+        $csrf     = Auth::csrfToken();
+        $canApply = Auth::isAdmin();
+
+        // Grouped by what the admin would actually do about each one, not by
+        // where the file lives. A list sorted by path makes them read the
+        // whole thing to find the one that needs a decision.
+        $groups = [
+            Updater::FILE_BEHIND   => [],
+            Updater::FILE_MISSING  => [],
+            Updater::FILE_CONFLICT => [],
+            Updater::FILE_UNKNOWN  => [],
+        ];
+        foreach ($rows as $r) {
+            if (isset($groups[$r['status']])) {
+                $groups[$r['status']][] = $r;
+            }
         }
 
-        $csrf = Auth::csrfToken();
-        $canApply = Auth::isAdmin();
-        $items = '';
-        $haveAny = false;
+        $heading = [
+            Updater::FILE_BEHIND   => 'Out of date, and you have not changed them',
+            Updater::FILE_MISSING  => 'Missing from your site',
+            Updater::FILE_CONFLICT => 'You changed these, and so did this release',
+            Updater::FILE_UNKNOWN  => 'Different from this release',
+        ];
+        $blurb = [
+            Updater::FILE_BEHIND =>
+                'Safe to apply — your copy is exactly what the previous release '
+                . 'shipped, so applying replaces nothing of your own.',
+            Updater::FILE_MISSING =>
+                'The file is not on your server at all. Whatever it provides is '
+                . 'inactive until it is restored.',
+            Updater::FILE_CONFLICT =>
+                'Applying would overwrite your changes. Your current version is '
+                . 'kept alongside as a .replaced- copy, so nothing is lost, but '
+                . 'any customisation would need re-applying by hand afterwards.',
+            Updater::FILE_UNKNOWN =>
+                'Your copy differs from this release, but this site has not '
+                . 'recorded a baseline yet, so there is no way to tell a '
+                . 'customisation from a file that is simply old. After the next '
+                . 'update these are classified properly.',
+        ];
 
-        foreach ($stale as $row) {
-            $file = (string) $row['file'];
-            $items .= '<li><code>' . e($file) . '</code><br>' . e((string) $row['effect']);
+        $body     = '';
+        $total    = 0;
+        $undelivered = 0;
 
-            if (isset($staged[$file])) {
-                $haveAny = true;
-                if ($canApply) {
-                    $items .= '<form method="post" action="' . url('/admin/views/apply') . '" class="pp-stale__act">'
+        foreach ($groups as $status => $items) {
+            if ($items === []) {
+                continue;
+            }
+            $total += count($items);
+            $body .= '<p class="pp-stale__h"><strong>' . e($heading[$status]) . '</strong><br>'
+                . e($blurb[$status]) . '</p><ul>';
+
+            foreach ($items as $row) {
+                $file = (string) $row['file'];
+                $body .= '<li><code>' . e($file) . '</code>';
+                if ($row['effect'] !== '') {
+                    $body .= '<br>' . e((string) $row['effect']);
+                }
+
+                if ($row['staged'] && $canApply) {
+                    $label = $status === Updater::FILE_CONFLICT
+                        ? 'Replace mine with this release\'s version'
+                        : 'Apply this file';
+                    $body .= '<form method="post" action="' . url('/admin/views/apply') . '" class="pp-stale__act">'
                         . '<input type="hidden" name="csrf_token" value="' . e($csrf) . '">'
                         . '<input type="hidden" name="file" value="' . e($file) . '">'
-                        . '<button class="btn btn-secondary btn-sm" type="submit">Apply this file</button>'
+                        . '<button class="btn btn-secondary btn-sm" type="submit">' . e($label) . '</button>'
                         . '</form>';
+                } elseif ($row['staged']) {
+                    $body .= '<div class="pp-stale__act"><em>An administrator can apply this.</em></div>';
                 } else {
-                    $items .= '<div class="pp-stale__act"><em>An administrator can apply this.</em></div>';
+                    $undelivered++;
+                    $body .= '<div class="pp-stale__act"><em>No replacement copy on your server yet.</em></div>';
                 }
+                $body .= '</li>';
             }
-            $items .= '</li>';
+            $body .= '</ul>';
         }
 
-        $intro = '<p>Updates never overwrite your view files, because they are yours to '
-            . 'restyle. These carry behaviour this version expects, so until they are '
-            . 'updated the features below are inactive — the site will otherwise look '
-            . 'completely normal.</p>';
+        if ($total === 0) {
+            return '';
+        }
 
-        $howto = $haveAny
-            ? '<p>The files are already on your server, delivered with the update. '
-              . 'Applying one keeps a copy of your current version alongside it, so a '
-              . 'customisation you did not mean to lose can be recovered.</p>'
-            : '<p>This release did not deliver replacement copies — that arrived in a '
-              . 'later version. Run an update first, then this notice will offer to '
-              . 'apply them. To do it by hand instead, take the files from the '
-              . '<strong>Source code (zip)</strong> on the release page, not the update '
-              . 'package, which deliberately contains no views.</p>';
+        $footer = $undelivered > 0
+            ? '<p>' . e((string) $undelivered) . ' of these were not delivered with your last '
+              . 'update, so there is nothing to apply yet. A release can only carry files that '
+              . 'the version you were running already knew how to accept — they will arrive '
+              . 'with the next one. To do it by hand before then, take them from the '
+              . '<strong>Source code (zip)</strong> on the release page, not the update package.</p>'
+            : '';
 
         return '<div class="pp-stale" role="alert">'
-            . '<strong>' . e((string) count($stale)) . ' file(s) are older than PlugPHP '
+            . '<strong>' . e((string) $total) . ' file(s) differ from PlugPHP '
             . e(Updater::VERSION) . '.</strong>'
-            . $intro . '<ul>' . $items . '</ul>' . $howto
+            . '<p>Updates never overwrite these files, because they are yours to restyle. '
+            . 'That protection is also why a release cannot deliver one on its own — so '
+            . 'they are listed here instead of changed behind your back.</p>'
+            . $body . $footer
             . '</div>'
             . '<style>'
             . '.pp-stale{background:#fdf3e0;border:1px solid #e8cf9a;color:#5c4108;'
             . 'border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:14px}'
-            . '.pp-stale ul{margin:.5rem 0 .5rem 1.1rem;padding:0}'
+            . '.pp-stale ul{margin:.5rem 0 .9rem 1.1rem;padding:0}'
             . '.pp-stale li{margin-bottom:.7rem}'
             . '.pp-stale code{background:#f4e6c6;padding:.1rem .3rem;border-radius:4px;font-size:12.5px}'
             . '.pp-stale p{margin:.4rem 0}'
+            . '.pp-stale__h{margin-top:.9rem}'
             . '.pp-stale__act{margin-top:.35rem}'
             . '</style>';
     }

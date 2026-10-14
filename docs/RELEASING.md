@@ -135,6 +135,53 @@ Two consequences worth keeping in mind when planning a release:
 
 ---
 
+## File fingerprinting
+
+Every build writes `core/ReferenceManifest.php` — the SHA-1 of each file an
+update delivers as a reference copy rather than installing. **Commit it with
+the release**; `tools/build-release.php` regenerates it each time it runs.
+
+An installed site compares three things, not two:
+
+| | |
+|---|---|
+| **your file** | what is on the server right now |
+| **what you should have had** | `storage/reference-baseline.json`, written at install and before each update |
+| **what is current** | the manifest shipped with the code now on disk |
+
+That third input is the point. Without a baseline, a file that differs from the
+release could equally be a customisation or a file that is simply old, and
+those need opposite handling. With it:
+
+- untouched and behind → offered for one-click apply
+- customised **and** changed upstream → shown as a conflict; applying keeps
+  the owner's version alongside as a `.replaced-<timestamp>` copy
+- customised, upstream unchanged → nothing said; their version stands
+- no baseline yet → reported honestly as "cannot tell", until the next update
+
+### The one-release-behind rule — read this before widening a release
+
+**A package is judged by the code the receiving site is already running, not
+by the code in the package.** `Updater::stagePackage()` rejects a package
+*whole* if it contains any path outside that site's updatable set.
+
+So a change to what a release may contain has to ship one release **before**
+the release that uses it:
+
+| Release | Ships | Effect |
+|---|---|---|
+| 1.5.0 | the rules that accept a wider reference set | sites learn to accept it |
+| 1.6.0 | the wider set itself (`--wide`) | now accepted, because every site runs ≥1.5.0 |
+
+`tools/build-release.php --wide` stages every reference file instead of the
+legacy eight. **It is not backward compatible** and the tool says so when you
+use it. Only reach for it once no installed site is older than 1.5.0.
+
+The same rule governs `SAFE_PATTERNS`. `modules/*/manifest.json` was added to
+it in 1.5.0 specifically so that 1.6.0 can ship module manifests; shipping them
+in the same release that added the pattern would have been refused by every
+existing site.
+
 ## Migrations in a release
 
 Ship new migrations as new files. Never edit a migration that has already been
