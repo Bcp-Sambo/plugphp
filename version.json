@@ -1,7 +1,41 @@
 {
-    "version": "1.4.0",
+    "version": "1.6.0",
     "security_advisory": false,
-    "changelog_url": "https://github.com/Bcp-Sambo/plugphp/releases/tag/v1.4.0",
-    "download_url": "https://github.com/Bcp-Sambo/plugphp/releases/download/v1.4.0/plugphp-update-1.4.0.zip",
-    "sha256": "1d826a21f50245a7e941775c8db609365506902822c4a83d809cabde1cf47be1"
+    "modules": {
+        "about": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "admin-dashboard": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "auth": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "blog": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "contact-form": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "home": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "projects": {
+            "version": "1.0.0",
+            "changelog": null
+        },
+        "services": {
+            "version": "1.0.0",
+            "changelog": null
+        }
+    },
+    "changelog_url": "https://github.com/Bcp-Sambo/plugphp/releases/tag/v1.6.0",
+    "download_url": "https://github.com/Bcp-Sambo/plugphp/releases/download/v1.6.0/plugphp-update-1.6.0.zip",
+    "sha256": "0f04bd65aaebbdce5dec284da9bcd8a8ad1220ba8c167f3266e01ee0c3d87786"
 }
