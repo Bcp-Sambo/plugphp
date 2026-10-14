@@ -7,6 +7,8 @@ on hosting that costs a few pounds a month.
 
 By Kabiru Sambo / Bubble Bot Solutions. Licensed GPL-3.0-or-later.
 
+![The PlugPHP admin dashboard](docs/images/05-dashboard.png)
+
 ---
 
 ## What PlugPHP is
@@ -30,6 +32,11 @@ PlugPHP takes the *feel* of the first and the *discipline* of the second:
 
 No framework. No Composer step. No npm. No build. No CLI access needed on the
 server. You download a ZIP and it runs.
+
+The installer is a web page — environment checks, then a module picker. No
+terminal, no `composer install`, no migration command to remember.
+
+![The PlugPHP web installer, showing environment checks and the module picker](docs/images/03-installer.png)
 
 ---
 
@@ -64,9 +71,18 @@ And in the dashboard itself:
 - **One-click updates** — the site checks a release feed, shows what changed,
   and applies or rolls back a release itself
 
+![The dashboard settings screen, with Branding, Email (SMTP) and Tracking tabs](docs/images/07-settings.png)
+
 ---
 
 ## Why you'd choose it
+
+**One template, any brand.** Site name, logo, colours and meta description are
+dashboard settings, not a code change — the same install dressed two ways:
+
+| Default | A client site |
+|---|---|
+| ![The default PlugPHP template](docs/images/01-homepage.png) | ![The same template with client branding applied](docs/images/04-branding.png) |
 
 **It runs where your clients already host.** Shared cPanel hosting, PHP 8,
 MySQL. No SSH, no Node, no Docker, no deploy pipeline. Point the document root
