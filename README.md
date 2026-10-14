@@ -1,12 +1,118 @@
 # PlugPHP
 
-A modular, agent-ready vanilla-PHP starter kit for shared / cPanel hosting —
-by Kabiru Sambo / Bubble Bot Solutions. Licensed GPL-3.0-or-later.
+**A modular, agent-ready vanilla-PHP starter kit for shared / cPanel hosting.**
+Upload it, open the installer in your browser, tick the modules you want — and
+you have a complete, secure, SEO-ready website with an admin dashboard, running
+on hosting that costs a few pounds a month.
 
-PlugPHP gives you WordPress's plug-and-play *feel* (web installer, module
-picker, admin dashboard) without WordPress, on the cheapest shared hosting,
-secure and SEO-hardened by default. Download it, run the browser installer,
-toggle the modules you want, and you have a fully populated site to build on.
+By Kabiru Sambo / Bubble Bot Solutions. Licensed GPL-3.0-or-later.
+
+---
+
+## What PlugPHP is
+
+PlugPHP sits in the gap between the two things most small-business sites get
+built with, and it is deliberately neither of them.
+
+WordPress gives you the plug-and-play experience — an installer, a dashboard, a
+plugin for everything — and charges you for it in attack surface, update
+anxiety, and a codebase nobody can fully read. A modern PHP framework gives you
+clean architecture, and charges you in Composer, npm, a build step, a CLI on the
+server, and a hosting bill to match.
+
+PlugPHP takes the *feel* of the first and the *discipline* of the second:
+
+- **The WordPress part** — a real web installer, a module picker, a working
+  admin dashboard, demo content seeded so the site is never empty.
+- **The framework part** — a locked `core/`, one folder per feature, every
+  security control structural rather than optional, and plain PHP you can read
+  end to end in an afternoon.
+
+No framework. No Composer step. No npm. No build. No CLI access needed on the
+server. You download a ZIP and it runs.
+
+---
+
+## What you get out of the box
+
+A finished, populated website — not a blank skeleton:
+
+| Module | What it gives you | Editable from the dashboard? |
+|---|---|---|
+| **Home** | Site root, with defensive teasers pulling from whichever other modules are on | Static |
+| **About** | Standard about page | Static |
+| **Services** | A list of what the business offers | ✅ |
+| **Projects** | Portfolio / past work, with images | ✅ |
+| **Blog** | Posts with slugs, featured images, Open Graph tags | ✅ |
+| **Contact form** | Emails the owner, logs to an inbox, spam honeypot | ✅ (inbox + reply) |
+| **Auth** | Login, registration, password reset, user management | ✅ |
+| **Admin dashboard** | The shell every other module plugs its panel into | Always on |
+
+Every content module is **independently removable** — untick it in the
+installer, or delete its folder later, and nothing else breaks.
+
+And in the dashboard itself:
+
+- **Branding** — logo, site name, colours, meta description, applied site-wide
+- **SMTP settings** — configure mail from the UI, with `.env` as fallback
+- **Tracking pixels** — Google Analytics, Meta, etc., validated before saving
+  and served under a nonce-based CSP
+- **Messages inbox** — read and reply to contact submissions without leaving
+  the site
+- **Users and roles** — `admin` and `editor`, enforced on routes, not just hidden
+  in the nav
+- **One-click updates** — the site checks a release feed, shows what changed,
+  and applies or rolls back a release itself
+
+---
+
+## Why you'd choose it
+
+**It runs where your clients already host.** Shared cPanel hosting, PHP 8,
+MySQL. No SSH, no Node, no Docker, no deploy pipeline. Point the document root
+at `public/` and you're live.
+
+**Security is structural, not advisory.** You cannot accidentally write an
+injectable query, because no raw-query method exists in `core/Database.php`.
+Output escaping is one character (`e()`). CSRF is required on every
+state-changing route. Security headers go out on every response. Uploads are
+validated, re-encoded, and neutralized. Stored secrets are encrypted. `.env`,
+`core/`, `config/` and `storage/` sit outside the web root by design. The full
+model is in [docs/security.md](docs/security.md).
+
+**SEO-hardened by default.** Clean URLs, per-page titles and meta descriptions,
+canonical tags, Open Graph with per-post `og:image`, and JSON-LD hooks — wired
+through `core/View.php` so a module gets them right without thinking about it.
+
+**It updates itself.** Most starter kits are a snapshot you fork and then
+maintain alone forever. PlugPHP ships an updater: installed sites see new
+releases, read the notes, and apply them from the dashboard.
+
+**It is built to be extended by an AI agent.** Every folder carries a
+`SKILL.md` — a versioned contract stating what an agent may and may not touch,
+and which rules are non-negotiable. Point any coding agent at the repo and it
+reads the same rules you do, instead of guessing. See
+[docs/agents.md](docs/agents.md).
+
+**You can read all of it.** No magic, no service container, no 400-dependency
+tree. `core/` is fifteen small classes.
+
+---
+
+## Who it's for
+
+- **Freelancers and agencies** building small-business sites on cheap hosting,
+  who want to stop re-solving auth, mail, uploads and the admin panel
+- **Developers who are done with WordPress** but whose clients still need a
+  dashboard they can log into
+- **Anyone using AI agents to build**, who wants guardrails the agent actually
+  reads
+
+Not for: high-traffic applications, anything needing queues, websockets or
+horizontal scaling. It is a starter kit for brochure-and-content sites, and it
+is honest about that.
+
+---
 
 ## Requirements
 

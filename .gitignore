@@ -15,7 +15,7 @@
 !/public/uploads/.gitignore
 !/public/uploads/.htaccess
 
-# Local Claude Code settings (per-machine, not part of the template)
+# Local agent / editor settings (per-machine, not part of the template)
 /.claude/settings.local.json
 
 # OS / editor cruft
