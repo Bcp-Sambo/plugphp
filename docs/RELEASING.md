@@ -119,9 +119,17 @@ The short version:
 
 - **Can:** `core/*.php`, `core/migrations/*.sql`,
   `modules/*/[Name]Module.php`, `modules/*/routes.php`,
-  `modules/*/migrations/*.sql`, `public/index.php`.
+  `modules/*/migrations/*.sql`, `modules/*/[Pascal]/[Pascal].php`,
+  `public/index.php`.
 - **Cannot:** views, `resources/`, `.env`, `config/modules.php`, any
   `.htaccess`, `vendor/`.
+
+`modules/*/[Pascal]/[Pascal].php` is the newest entry and the only one with a
+shape requirement rather than a fixed name: one subdirectory level, PascalCase
+on the directory and the filename. It admits
+`modules/ecommerce/Gateways/PaystackGateway.php` while still refusing
+`modules/ecommerce/views/cart.php`, which a generic one-level rule would have
+let through.
 
 Two consequences worth keeping in mind when planning a release:
 
@@ -209,6 +217,9 @@ defaults, and never rename or drop a column that shipped code still reads.
       It must report PASS on all three sections — the unguarded control is
       expected to oversell, and a *clean* control means the race never
       collided and the guarded result proved nothing.
+- [ ] `php tools/test-safe-paths.php` passes. Always — not only when
+      `SAFE_PATTERNS` changed. It is the allowlist the whole feature rests on,
+      it needs no database or network, and it takes a moment.
 - [ ] `php tools/test-http.php` passes if `core/Http.php` or any gateway call
       changed. It generates its own certificate authority and needs no network
       access; the third section must FAIL to connect, which is what proves

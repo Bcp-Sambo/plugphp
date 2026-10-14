@@ -71,6 +71,33 @@ final class Updater
         // runs on the RECEIVING site — a package is refused by the rules the
         // site already has, not the rules it is about to receive.
         '#^modules/[a-z0-9-]+/manifest\.json$#',
+        // Class files in ONE subdirectory of a module, e.g.
+        // modules/ecommerce/Gateways/PaystackGateway.php. A module needing
+        // more than one class had no way to ship before this.
+        //
+        // Both halves are PascalCase, and that is the part doing the work:
+        // it cannot match views/, migrations/, assets/, templates/, lang/ or
+        // config/ — every lowercase convention directory stays shut by shape,
+        // with no exclusion list to keep current. Views are the one thing an
+        // update may never install, and a generic one-level rule would have
+        // admitted modules/<name>/views/cart.php while still LOOKING narrow.
+        //
+        // One level, not arbitrary depth, because the value of this list is
+        // that it can be read at a glance: '(?:/[A-Za-z0-9]+)*' would be a
+        // file-extension filter wearing an allowlist's clothes. Widening
+        // later is a one-line release; narrowing later starts rejecting
+        // packages built against the wider rule, on the sites slowest to
+        // update. Start tight.
+        //
+        // Added a release BEFORE anything uses it, for the same reason as
+        // manifest.json above.
+        //
+        // NOTE the limit of the guarantee: this shuts the view set as it
+        // exists (lowercase directory, lowercase filename). It does not stop
+        // a future module rendering from a PascalCase 'Views/Cart.php' —
+        // View::render() takes whatever absolute path a module hands it. That
+        // stays closed by convention: view files live in lowercase views/.
+        '#^modules/[a-z0-9-]+/[A-Z][A-Za-z0-9]*/[A-Z][A-Za-z0-9]*\.php$#',
     ];
 
     /** Settings keys. */

@@ -127,6 +127,23 @@ foreach ((array) glob("$root/modules/*", GLOB_ONLYDIR) as $dir) {
     if (is_file("$dir/routes.php"))                            { $candidates[] = "modules/$m/routes.php"; }
     foreach ((array) glob("$dir/migrations/*.sql") as $f)      { $candidates[] = "modules/$m/migrations/" . basename($f); }
     if (is_file("$dir/manifest.json"))                         { $candidates[] = "modules/$m/manifest.json"; }
+
+    // Class files in one PascalCase subdirectory, e.g. Gateways/Paystack.php.
+    //
+    // Only PascalCase directories are walked, mirroring SAFE_PATTERNS: a
+    // lowercase views/ or migrations/ must not even be considered, or every
+    // build would collect a view and then abort on it.
+    //
+    // Inside such a directory, every .php file IS collected, including one
+    // the allowlist will refuse. That is deliberate — the refusal below is
+    // fatal and names the file, so a class that cannot ship is a loud build
+    // failure for the maintainer rather than a file silently missing from
+    // the package that every site then installs without it.
+    foreach ((array) glob("$dir/*", GLOB_ONLYDIR) as $sub) {
+        $subName = basename($sub);
+        if (!preg_match('/^[A-Z][A-Za-z0-9]*$/', $subName)) { continue; }
+        foreach ((array) glob("$sub/*.php") as $f)              { $candidates[] = "modules/$m/$subName/" . basename($f); }
+    }
 }
 
 sort($candidates);

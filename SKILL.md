@@ -399,6 +399,13 @@ package containing anything outside the list is rejected whole.
 - `modules/*/[Name]Module.php`
 - `modules/*/routes.php`
 - `modules/*/migrations/*.sql`
+- `modules/*/[Pascal]/[Pascal].php` — class files in **one** subdirectory of a
+  module, e.g. `modules/ecommerce/Gateways/PaystackGateway.php`. One level
+  only, and both the directory and the filename must be PascalCase: that is
+  what keeps `views/`, `migrations/`, `assets/`, `templates/` and every other
+  lowercase convention directory out, by shape rather than by an exclusion
+  list. Put a module's extra classes here; a second PHP file at the module
+  root cannot ship.
 - `public/index.php`
 
 **Never touched by an update, under any circumstance:**
@@ -422,6 +429,12 @@ package containing anything outside the list is rejected whole.
   piece of owner-entered content — belongs in the database via `Settings`, not
   in a file under `core/` or `modules/*/`.
 - Do not widen the safe list. It is the entire safety guarantee of the feature.
+  If it genuinely must be widened, the wider rule has to ship **one release
+  before** anything uses it: a package is judged by the rules the receiving
+  site is already running, so a release that both widens the list and relies
+  on the widening is refused by every installed site. `tools/test-safe-paths.php`
+  asserts the list path by path — run it after any change there, and never cut
+  a release while it fails.
 
 `core/` is not a module, but additions to it (`Updater.php`, `Url.php`,
 `Settings.php`) follow the same conventions as the rest of `core/`: final

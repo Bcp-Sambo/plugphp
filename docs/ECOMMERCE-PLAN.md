@@ -117,9 +117,10 @@ accept 1.6.0, let alone a later one.
 
 ### Phase A — core plumbing (1.7.0, no ecommerce code)
 
-**Status:** items 1, 2 and 3 are **done** — `Database::transaction()` in
-`core/Database.php:155` with `tools/test-stock-locking.php`, and `core/Http.php`
-with `tools/test-http.php`. Items 4–6 remain.
+**Status:** items 1–4 are **done** — `Database::transaction()` in
+`core/Database.php:155` with `tools/test-stock-locking.php`, `core/Http.php`
+with `tools/test-http.php`, and the widened `SAFE_PATTERNS` with
+`tools/test-safe-paths.php`. Items 5 and 6 remain.
 
 1. ~~`Database::transaction(callable $fn): mixed`~~ **done.**
    Begin/commit/rollback around a closure, rethrowing after rollback, return
@@ -170,12 +171,30 @@ with `tools/test-http.php`. Items 4–6 remain.
    Verified that sabotaging each guarantee (TLS verification, the redirect
    policy, the byte cap, the log scrubbing) fails exactly the matching
    assertion and no others.
-4. Widen `SAFE_PATTERNS` with
-   `#^modules/[a-z0-9-]+/[A-Z][A-Za-z0-9]*/[A-Z][A-Za-z0-9]*\.php$#` — one
-   level of subdirectory, PascalCase on both halves so it can never match
-   `views/`, `migrations/` or any other lowercase convention directory
-   (§5.2). Add it to `tools/build-release.php`'s candidate glob in the same
-   change.
+4. ~~Widen `SAFE_PATTERNS`~~ **done.**
+   `#^modules/[a-z0-9-]+/[A-Z][A-Za-z0-9]*/[A-Z][A-Za-z0-9]*\.php$#` is in
+   `core/Updater.php`, and `tools/build-release.php` now walks PascalCase
+   module subdirectories to match. Verified end to end: a scratch module's
+   `Gateways/ProbeGateway.php` lands in the zip as a code path while its
+   `views/cart.php` travels only under `reference-views/`.
+
+   The builder deliberately collects **every** `.php` in a PascalCase
+   directory, including one the allowlist refuses, because refusal is fatal
+   and names the file — a class that cannot ship becomes a loud build failure
+   (exit 1) rather than a file silently missing from the package every site
+   then installs without. Confirmed with a lowercase `Gateways/helper.php`.
+
+   `tools/test-safe-paths.php` asserts 55 paths. What the sabotage runs
+   showed is worth recording, because it is worse than §5.2 predicted: with
+   the generic one-level rule, `modules/blog/views/index.php` does not merely
+   become installable — it also **stops being delivered as a reference copy**,
+   because `isReferenceFile()` excludes anything `isSafePath()` accepts. So a
+   careless widening would overwrite customised views *and* remove the
+   dashboard's ability to show the owner a diff of what changed. One regex,
+   both halves of the protection.
+
+   Still outstanding from §5.2 and unchanged: this ships in 1.7.0, a release
+   **before** the one that uses it.
 5. Bulk apply on the Updates screen: "apply all missing files" for entries
    classified `missing`, one confirmation, each still backed up individually.
 6. Rate limiting: `core/Throttle.php` over a shared `request_throttle` table
@@ -522,9 +541,10 @@ load-bearing; the symbol riding along with it is the cheap half.
       with `is_demo = 1` all gone, and nothing referencing them.
 - [ ] Checkout refuses the 11th attempt from one IP within the hour, and a
       visitor whose IP cannot be read is still served.
-- [ ] A package containing `modules/ecommerce/views/cart.php` is still
+- [x] A package containing `modules/ecommerce/views/cart.php` is still
       **rejected** after `SAFE_PATTERNS` is widened. The PascalCase rule is
-      only worth having if this stays true.
+      only worth having if this stays true — asserted in
+      `tools/test-safe-paths.php`, both as a path and as a package entry.
 
 ---
 

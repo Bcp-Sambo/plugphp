@@ -32,6 +32,25 @@ it to a PascalCase class + `Module` suffix (`notes` → `NotesModule`,
 `contact-form` → `ContactFormModule`). The class name must match, or the loader
 skips the module.
 
+**If the module needs more classes than its `[Name]Module.php`**, put them in
+one PascalCase subdirectory — `Gateways/`, `Services/` — with PascalCase
+filenames:
+
+```
+modules/notes/
+├─ NotesModule.php
+├─ Services/
+│  └─ Exporter.php
+└─ …
+```
+
+That shape is not decoration. An update may only install
+`modules/*/[Pascal]/[Pascal].php`, one level deep: a second PHP file at the
+module root, a lowercase directory, or a second level of nesting cannot be
+shipped by an update at all, and a release containing one is rejected whole.
+Keep view files in lowercase `views/` with lowercase names for the same
+reason in reverse — that is what keeps an update from ever overwriting them.
+
 ## 2. The migration
 
 Migrations are trusted `.sql` files run once at install, in filename order.
