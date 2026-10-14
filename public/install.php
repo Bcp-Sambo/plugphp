@@ -23,6 +23,12 @@ define('ENV_FILE', ROOT . '/.env');
 define('MODULES_FILE', ROOT . '/config/modules.php');
 define('LOCK_FILE', ROOT . '/config/installed.lock');
 
+// Needed by the module picker to show declared capabilities. Safe to load
+// this early: Module.php touches no database and reads no configuration.
+if (is_file(ROOT . '/core/Module.php')) {
+    require_once ROOT . '/core/Module.php';
+}
+
 /** Always installed; not shown as togglable in the picker. */
 $ALWAYS_ON = array('home', 'admin-dashboard', 'auth');
 /** Optional modules the site owner can pick. */
@@ -210,6 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             require_once ROOT . '/core/Settings.php';
             // Needed for the fingerprint baseline written at step 6.
             require_once ROOT . '/core/Updater.php';
+            require_once ROOT . '/core/SecurityLog.php';
 
             Config::load(ENV_FILE);
 
@@ -412,7 +419,8 @@ p.intro{font-size:14.5px;color:#6B7280;margin:8px 0 0}
 .check-note{display:block;font-size:12.5px;color:#9CA3AF;margin-top:2px}
 .always{font-size:13px;color:#9CA3AF;margin:0 0 12px}
 .mods{display:flex;flex-direction:column;gap:8px}
-.mod{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid rgba(31,41,55,.12);border-radius:8px;cursor:pointer}
+.mod{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;border:1px solid rgba(31,41,55,.12);border-radius:8px;cursor:pointer}
+.mod__cap{flex:1 0 100%;font-size:12.5px;line-height:1.5;color:#6B7280;margin:-2px 0 0}
 .mod__cb{position:absolute;opacity:0;width:1px;height:1px}
 .mod__name{font-weight:600;font-size:14.5px;flex:1 1 auto}
 .mod__sw{width:40px;height:23px;border-radius:999px;background:#d1d5db;position:relative;flex:0 0 auto;transition:background .16s}
@@ -522,12 +530,17 @@ page_top('Install PlugPHP', '~5 min · no CLI');
     <div class="sec">
         <p class="sec__label">2 · Modules</p>
         <p class="always"><code>home</code>, <code>admin-dashboard</code> and <code>auth</code> are always installed.</p>
+        <p class="always">Each module states below what it touches. These are declarations by the
+        module, shown so you can see what you are turning on — they are not enforced
+        restrictions, and nothing prevents a module doing more than it says.</p>
         <div class="mods">
             <?php foreach ($OPTIONAL as $m): ?>
                 <label class="mod">
                     <input type="checkbox" class="mod__cb" name="modules[]" value="<?= h($m) ?>" <?= in_array($m, $old['modules'], true) ? 'checked' : '' ?>>
                     <span class="mod__name"><?= h($m) ?></span>
                     <span class="mod__sw" aria-hidden="true"></span>
+                    <?php $cap = class_exists('Module') ? Module::capabilitySummary($m) : ''; ?>
+                    <?php if ($cap !== ''): ?><span class="mod__cap"><?= h($cap) ?></span><?php endif; ?>
                 </label>
             <?php endforeach; ?>
         </div>

@@ -1,0 +1,22 @@
+{
+    "module": "services",
+    "version": "1.0.0",
+    "db_tables_owned": [
+        "services"
+    ],
+    "handles_file_uploads": false,
+    "network_access": [],
+    "sends_email": false,
+    "admin_routes": [
+        "/admin/services",
+        "/admin/services/new",
+        "/admin/services/visibility",
+        "/admin/services/{id}",
+        "/admin/services/{id}/delete",
+        "/admin/services/{id}/edit"
+    ],
+    "public_routes": [
+        "/services",
+        "/services/{slug}"
+    ]
+}

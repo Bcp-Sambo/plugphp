@@ -23,6 +23,7 @@ require_once __DIR__ . '/../core/Tracking.php';
 require_once __DIR__ . '/../core/Branding.php';
 require_once __DIR__ . '/../core/Upload.php';
 require_once __DIR__ . '/../core/Updater.php';
+require_once __DIR__ . '/../core/SecurityLog.php';
 
 Config::load(__DIR__ . '/../.env');
 

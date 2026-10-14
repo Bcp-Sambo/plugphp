@@ -125,6 +125,7 @@ foreach ((array) glob("$root/modules/*", GLOB_ONLYDIR) as $dir) {
     foreach ((array) glob("$dir/*Module.php") as $f)           { $candidates[] = "modules/$m/" . basename($f); }
     if (is_file("$dir/routes.php"))                            { $candidates[] = "modules/$m/routes.php"; }
     foreach ((array) glob("$dir/migrations/*.sql") as $f)      { $candidates[] = "modules/$m/migrations/" . basename($f); }
+    if (is_file("$dir/manifest.json"))                         { $candidates[] = "modules/$m/manifest.json"; }
 }
 
 sort($candidates);

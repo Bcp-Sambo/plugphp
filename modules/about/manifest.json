@@ -1,0 +1,12 @@
+{
+    "module": "about",
+    "version": "1.0.0",
+    "db_tables_owned": [],
+    "handles_file_uploads": false,
+    "network_access": [],
+    "sends_email": false,
+    "admin_routes": [],
+    "public_routes": [
+        "/about"
+    ]
+}
