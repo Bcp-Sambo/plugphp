@@ -26,7 +26,7 @@ final class Updater
      * package (it lives in core/, which is overwritable), so it updates itself
      * when a package is applied.
      */
-    public const VERSION = '1.5.0';
+    public const VERSION = '1.6.0';
 
     /**
      * Where the update feed lives. HARDCODED ON PURPOSE — never read from
@@ -160,7 +160,102 @@ final class Updater
             'changelog_url'     => is_string($data['changelog_url'] ?? null) ? $data['changelog_url'] : '',
             'download_url'      => $data['download_url'],
             'sha256'            => strtolower($data['sha256']),
+            // Validated field by field rather than passed through: this is
+            // remote JSON, and it ends up rendered in the dashboard.
+            'modules'           => self::parseFeedModules($data['modules'] ?? null),
         ];
+    }
+
+    /**
+     * Per-module versions out of the feed, shaped and bounded.
+     *
+     * @return array<string, array{version:string, changelog:?string}>
+     */
+    private static function parseFeedModules(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $name => $info) {
+            if (!is_string($name) || !preg_match('/^[a-z0-9-]{1,50}$/', $name)) {
+                continue;
+            }
+            if (!is_array($info)) {
+                continue;
+            }
+            $version = $info['version'] ?? null;
+            if (!is_string($version) || !preg_match('/^\d+\.\d+\.\d+$/', $version)) {
+                continue;
+            }
+            $log = $info['changelog'] ?? null;
+            $out[$name] = [
+                'version'   => $version,
+                // Truncated: a feed is remote input, and an unbounded string
+                // here is an unbounded string in the dashboard.
+                'changelog' => is_string($log) && $log !== '' ? substr($log, 0, 300) : null,
+            ];
+        }
+
+        ksort($out);
+        return $out;
+    }
+
+    /**
+     * What a release changes per module, against what this site actually runs.
+     *
+     * Only modules this site has are reported — a release listing fifteen
+     * modules should not tell an owner about twelve they do not use.
+     *
+     * @return array<int, array{module:string,from:string,to:string,changelog:?string,status:string}>
+     */
+    public static function moduleChanges(array $manifest): array
+    {
+        // Re-shaped here rather than trusted. fetchManifest() already sanitises
+        // what it returns, but this method is public and takes a plain array,
+        // so it must not depend on having been handed a clean one — the input
+        // originates from a remote feed and ends up rendered in the dashboard.
+        $feed = self::parseFeedModules($manifest['modules'] ?? null);
+        if ($feed === [] || !class_exists('Module')) {
+            return [];
+        }
+
+        $installed = class_exists('ModuleManager') ? ModuleManager::installed() : [];
+        $out = [];
+
+        foreach ($feed as $name => $info) {
+            if (!in_array($name, $installed, true)) {
+                // Present in the release but not on this site: a genuinely new
+                // module. Worth saying, because it is about to arrive.
+                $out[] = [
+                    'module'    => $name,
+                    'from'      => '',
+                    'to'        => $info['version'],
+                    'changelog' => $info['changelog'],
+                    'status'    => 'new',
+                ];
+                continue;
+            }
+
+            $local = Module::manifestFor($name);
+            $from = $local['version'] ?? '';
+            $to = $info['version'];
+
+            if ($from !== '' && version_compare($to, $from, '<=')) {
+                continue; // unchanged, say nothing
+            }
+
+            $out[] = [
+                'module'    => $name,
+                'from'      => $from,
+                'to'        => $to,
+                'changelog' => $info['changelog'],
+                'status'    => 'changed',
+            ];
+        }
+
+        return $out;
     }
 
     /** True when $manifest names a version newer than the files on disk. */

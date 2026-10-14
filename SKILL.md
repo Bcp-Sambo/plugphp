@@ -106,6 +106,66 @@ dashboard footer, the About page, and the 404 page. It is **not** placed
 in the global `layout.php` footer — don't add it there, and don't remove
 it from the three places above without being asked.
 
+## Every module ships a manifest.json
+
+**Required for every new module**, alongside its `SKILL.md`:
+
+```json
+{
+  "module": "ecommerce",
+  "version": "1.0.0",
+  "changelog": "First release",
+  "db_tables_owned": ["orders", "order_items"],
+  "handles_file_uploads": true,
+  "network_access": ["api.stripe.com"],
+  "sends_email": true,
+  "admin_routes": ["/admin/orders"],
+  "public_routes": ["/shop", "/cart"]
+}
+```
+
+- `module` MUST match the folder name. A manifest naming a different module
+  than the folder it sits in is refused, not trusted — the folder is the fact,
+  the file is the claim.
+- Keep it **honest and current**. It is read by the installer's module picker
+  and by `/admin/modules`, and it is the reference an audit checks the code
+  against. A manifest that has drifted from what the module does is worse than
+  none, because it is believed.
+- `version` and `changelog` are what `/admin/updates` shows as
+  "Ecommerce 1.1 → 1.2 — adds shipping zones". Bump the version when that
+  module changes; leave `changelog` null when there is nothing worth saying.
+- Never loaded during a normal request, so it costs a live site nothing.
+
+**It is a declaration, not a sandbox.** PHP on shared hosting cannot stop a
+module touching something it did not declare, and nothing here is enforced at
+runtime. Its value is disclosure and an audit surface. Never describe it to a
+user as "sandboxed", "isolated" or "restricted" — that would be a lie that
+matters, because someone would rely on it.
+
+## Modules are enabled and disabled at /admin/modules
+
+Module selection is **not** install-time only. `/admin/modules` lists every
+module physically present, active or not, and is the only supported way to turn
+one on or off after install. Never tell anyone to hand-edit
+`config/modules.php`.
+
+- **Do not assume your module is active just because it shipped in core.** A
+  module arriving in a release stays off until an administrator enables it.
+  `config/modules.php` is on the updater's untouched list and stays there.
+- **Migrations run at activation**, not at update time. A module enabled six
+  months after it shipped gets its schema created at that moment.
+- `home`, `admin-dashboard` and `auth` can never be disabled — doing so would
+  remove the login and leave no way back in. The set is defined once, in
+  `ModuleManager::ALWAYS_ON`; do not write a second copy of it.
+- **Disable is not the same as Hide** (next section). Disable means the module
+  is not loaded at all — no routes, no admin panel, its pages 404. Hide means
+  it runs normally but is not linked in the public menu. Keep them distinct.
+- Every enable, disable and permanent removal writes a `SecurityLog` entry.
+  **This is a hard rule**, not a nicety: this is the one screen that can
+  silently change what a site does, and an unlogged change here is
+  indistinguishable from a compromise. If you add a path that changes
+  `config/modules.php`, it logs.
+
 ## Per-module public visibility toggle
 
 Any content module (blog, services, projects, etc.) can be hidden from

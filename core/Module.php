@@ -28,7 +28,11 @@ abstract class Module
      * Read by install.php and the dashboard only. Never loaded during a normal
      * request, so it costs a live site nothing.
      *
-     * @return array{module:string,version:string,db_tables_owned:array<int,string>,handles_file_uploads:bool,network_access:array<int,string>,sends_email:bool,admin_routes:array<int,string>,public_routes:array<int,string>}|null
+     * `changelog` is optional and describes what changed in THIS module at its
+     * current version — it is what /admin/updates shows beside the version bump,
+     * instead of one undifferentiated "an update is available".
+     *
+     * @return array{module:string,version:string,changelog:?string,db_tables_owned:array<int,string>,handles_file_uploads:bool,network_access:array<int,string>,sends_email:bool,admin_routes:array<int,string>,public_routes:array<int,string>}|null
      */
     public static function manifestFor(string $name): ?array
     {
@@ -63,6 +67,7 @@ abstract class Module
         return [
             'module'               => $name,
             'version'              => is_string($data['version'] ?? null) ? $data['version'] : '',
+            'changelog'            => is_string($data['changelog'] ?? null) ? $data['changelog'] : null,
             'db_tables_owned'      => $strings($data['db_tables_owned'] ?? []),
             'handles_file_uploads' => !empty($data['handles_file_uploads']),
             'network_access'       => $strings($data['network_access'] ?? []),

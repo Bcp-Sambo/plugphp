@@ -354,6 +354,18 @@ Even a module with no tables must implement `migrations()` (return `[]`). See
 
 ---
 
+Reading a module's declared capabilities (never loaded during a normal request):
+
+```php
+Module::manifestFor('blog');        // validated array, or null
+Module::capabilitySummary('blog');  // one-line plain-English summary
+```
+
+A manifest naming a different module than its folder is refused, not trusted.
+It is a declaration, not a sandbox — nothing enforces it at runtime.
+
+---
+
 ## Settings
 
 `core/Settings.php` — a shared key/value store (one `site_settings` table) for
@@ -442,6 +454,66 @@ Backups live in `storage/backups/`, capped at the 3 most recent, and the
 rollback button is offered for 7 days.
 
 ---
+## ModuleManager
+
+`core/ModuleManager.php` — turning modules on and off after install time.
+Backs `/admin/modules`.
+
+```php
+ModuleManager::installed();                  // folder names present on disk
+ModuleManager::enabled();                    // the config/modules.php list
+ModuleManager::overview();                   // everything the screen needs, one pass
+ModuleManager::isEnabled('blog');
+ModuleManager::isAlwaysOn('auth');           // home, admin-dashboard, auth
+ModuleManager::ignored();                    // deleted on purpose; updates skip these
+
+ModuleManager::enable('ecommerce');          // + runs ITS migrations, now
+ModuleManager::disable('blog');              // files and tables untouched
+ModuleManager::removePermanently('blog');    // deletes the folder, remembers that
+```
+
+Each state-changing call returns `['success' => bool, 'message' => string]` and
+writes a `SecurityLog` entry.
+
+**Disable is not Hide.** Disable removes the module from `config/modules.php`,
+so it is not loaded at all — no routes, no admin panel, its pages 404. Hide
+(`Settings::isModuleVisible()`) leaves it running and only takes its link out of
+the public menu. Both exist because they are different granularities.
+
+`ModuleManager::ALWAYS_ON` is the single definition of the modules that cannot
+be switched off; `install.php` reads the same constant. Do not write a second
+copy of that list.
+
+`config/modules.php` is written to a temp file and renamed, so a request
+arriving mid-write never reads a half-written list.
+
+---
+
+## SecurityLog
+
+`core/SecurityLog.php` — the audit trail for actions that change what a site
+can do.
+
+```php
+SecurityLog::log(SecurityLog::MODULE_ENABLED, ['module' => 'ecommerce']);
+SecurityLog::recent(25);   // newest first, acting account resolved
+```
+
+Deliberately narrow: module enable/disable/remove, not page edits or logins. A
+log that records everything gets ignored, and an ignored log is not an audit
+trail.
+
+`log()` never throws — an audit write must not take down the action it
+describes — but a failure is written to the PHP error log rather than swallowed.
+Proxy headers are **not** consulted when recording the caller's address: on
+shared hosting anyone can set `X-Forwarded-For`, so trusting it would let the
+person being audited choose what the audit says.
+
+**Every path that changes `config/modules.php` or deletes a module folder must
+call `log()`.** That is a hard rule.
+
+---
+
 ## Upload
 
 > Signature note: `Upload::image($file, $subdir, ?int $maxBytes = null, ?array $onlyTypes = null)`.

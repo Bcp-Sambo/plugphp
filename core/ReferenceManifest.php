@@ -9,15 +9,16 @@
  */
 
 return [
-    'version' => '1.5.0',
+    'version' => '1.6.0',
     'files' => [
         '.htaccess' => '1a2d7df4d9a36980533c16c8321b9641caf3d916',
         'config/.htaccess' => 'fd28901bbae28ba4e808f281fe11848730378143',
         'modules/about/views/about.php' => 'fd9f5d1ecf83b4c71d2cee2ad76a7896fbf43ae7',
         'modules/admin-dashboard/views/dashboard.php' => '119b846538dc1856f4d39974edfe6f1536ec5d87',
         'modules/admin-dashboard/views/layout.php' => '3a1dcb06bcbd37b03bf37a8aff05a8eadb047dfc',
+        'modules/admin-dashboard/views/modules.php' => '72d876a13aed877b089a50804488ac977d463f58',
         'modules/admin-dashboard/views/settings.php' => '406bdb22ffea02fe2a3a4b2a6cda46be910ad225',
-        'modules/admin-dashboard/views/updates.php' => 'c369f85a346ec26ded653d45b8f342f5fae1aae1',
+        'modules/admin-dashboard/views/updates.php' => '62b65e7201e2fef8e4829bb0f625381b96343852',
         'modules/auth/views/admin_user_delete.php' => '31d335b9857fd21b0f035bf56212d3e546a29e89',
         'modules/auth/views/admin_users.php' => 'fae569cfece3e511894d22b92c0f926404dec339',
         'modules/auth/views/forgot-password.php' => 'f1108bab10baab7894e125f3f2961d95088dd538',
