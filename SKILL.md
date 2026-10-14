@@ -417,6 +417,14 @@ package containing anything outside the list is rejected whole.
 - `public/.htaccess` and the root `.htaccess` — may carry custom redirects or
   headers. If a patch needs an `.htaccess` change it is surfaced as a manual
   diff for the owner to review, never applied automatically.
+
+  These arrive as reference copies in `storage/pending-views/` and are applied
+  from the dashboard, one file and one decision at a time. The single
+  exception is files that are **missing** altogether: those have no local
+  version to lose, so the notice offers one button to restore them all —
+  which is what makes enabling a new module bearable, since every one of its
+  views is missing at once. Anything that could overwrite the owner's own work
+  stays per-file.
 - `vendor/` — dependency updates are a manual reupload. Auto-update cannot
   ship a patched PHPMailer; that is a deliberate trade for a narrow blast
   radius, and it means a dependency CVE needs a full redownload of the kit.

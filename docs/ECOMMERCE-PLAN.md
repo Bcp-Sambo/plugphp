@@ -117,10 +117,11 @@ accept 1.6.0, let alone a later one.
 
 ### Phase A — core plumbing (1.7.0, no ecommerce code)
 
-**Status:** items 1–4 are **done** — `Database::transaction()` in
+**Status: Phase A is complete.** `Database::transaction()` in
 `core/Database.php:155` with `tools/test-stock-locking.php`, `core/Http.php`
-with `tools/test-http.php`, and the widened `SAFE_PATTERNS` with
-`tools/test-safe-paths.php`. Items 5 and 6 remain.
+with `tools/test-http.php`, the widened `SAFE_PATTERNS` with
+`tools/test-safe-paths.php`, the bulk apply with `tools/test-bulk-apply.php`,
+and `core/Throttle.php` — item 6 — still to write before Phase D calls it.
 
 1. ~~`Database::transaction(callable $fn): mixed`~~ **done.**
    Begin/commit/rollback around a closure, rethrowing after rollback, return
@@ -195,8 +196,33 @@ with `tools/test-http.php`, and the widened `SAFE_PATTERNS` with
 
    Still outstanding from §5.2 and unchanged: this ships in 1.7.0, a release
    **before** the one that uses it.
-5. Bulk apply on the Updates screen: "apply all missing files" for entries
-   classified `missing`, one confirmation, each still backed up individually.
+5. ~~Bulk apply~~ **done.** `Updater::applyAllMissing()` plus
+   `POST /admin/views/apply-all`, offered in the stale-file notice only for
+   the `missing` group and only when more than one is waiting.
+
+   **It needs no view change, so it ships normally** — contrary to the worry
+   raised when this item was scheduled. The notice is built in
+   `AdminDashboardModule::staleViewNotice()`, a module class, which is in
+   `SAFE_PATTERNS`. Nothing under `views/` was touched.
+
+   Scoped to `missing` and nothing else, which is the whole design: a missing
+   file has no local version to lose, so one confirmation for the batch is
+   honest. `behind`, `conflict` and `unknown` stay one at a time because each
+   can overwrite the owner's work and the per-file decision *is* the
+   protection.
+
+   Two things worth carrying forward:
+
+   - The notice renders on **every** admin page, while the `data-confirm`
+     script lives in `views/updates.php` and only runs on the Updates screen.
+     A `data-confirm` here would have silently done nothing everywhere else —
+     the same class of bug as the inline `onsubmit` handlers the CSP used to
+     swallow. The notice carries its own nonce'd script, under a different
+     attribute name so the Updates page does not bind it twice.
+   - **Neither apply path writes a `SecurityLog` entry** — not the existing
+     per-file one, not this. Applying a view turns functionality on, which is
+     arguably what that log is for; it is left alone here rather than changed
+     for one path and not the other. Worth deciding deliberately.
 6. Rate limiting: `core/Throttle.php` over a shared `request_throttle` table
    keyed by action + IP, with `SecurityLog::clientIp()` promoted to public as
    the single definition of the caller's address (§5.1). Checkout runs at 10

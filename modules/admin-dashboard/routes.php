@@ -133,3 +133,11 @@ $router->post('/admin/views/apply', function (): void {
     // Guards live in the handler; see AdminDashboardModule::applyView().
     AdminDashboardModule::applyView();
 });
+
+$router->post('/admin/views/apply-all', function (): void {
+    // Guards live in the handler; see AdminDashboardModule::applyAllMissingViews().
+    // Separate route rather than a mode flag on the one above: the two have
+    // different blast radii, and a flag is the kind of thing that gets passed
+    // by accident.
+    AdminDashboardModule::applyAllMissingViews();
+});

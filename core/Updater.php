@@ -839,6 +839,100 @@ final class Updater
         ];
     }
 
+    /**
+     * Apply every delivered file the site is MISSING, in one action.
+     *
+     * Enabling a brand new module is the case this exists for: every one of
+     * its views is missing at once, and applying a dozen files one button at
+     * a time is a genuinely bad first experience.
+     *
+     * MISSING ONLY, AND THAT IS THE WHOLE DESIGN. A missing file has no local
+     * version to lose, so a single confirmation for the batch is an honest
+     * trade. `behind`, `conflict` and `unknown` stay one at a time on purpose:
+     * each of those can overwrite something the owner wrote, and the per-file
+     * decision IS the protection. A bulk "apply everything" would quietly
+     * turn that into one click.
+     *
+     * Each file still goes through applyPendingView(), so the backup, the
+     * writability checks and the path validation are the same single code
+     * path — not a second, looser one that happens to be faster.
+     *
+     * The missing list is re-derived here rather than taken from the form, so
+     * a file that reappeared between the page rendering and the button being
+     * pressed is simply never in the batch. That is what actually keeps the
+     * promise above; the is_file() check inside the loop is defence in depth
+     * for the much smaller window within this one request, and for the case
+     * where two admins press the button at the same moment.
+     *
+     * Called only from an authenticated, CSRF-guarded admin action.
+     *
+     * @return array{success:bool, applied:int, skipped:int, failed:array<int,string>, message:string}
+     */
+    public static function applyAllMissing(): array
+    {
+        $root = self::root();
+
+        $targets = [];
+        foreach (self::referenceStatus() as $row) {
+            if ($row['status'] === self::FILE_MISSING && $row['staged']) {
+                $targets[] = (string) $row['file'];
+            }
+        }
+        sort($targets); // deterministic order, so the report reads sensibly
+
+        if ($targets === []) {
+            return [
+                'success' => false,
+                'applied' => 0,
+                'skipped' => 0,
+                'failed'  => [],
+                'message' => 'Nothing to apply — no missing file has a delivered copy waiting. '
+                    . 'The list may have changed since this page was loaded; reload it to see '
+                    . 'where things stand.',
+            ];
+        }
+
+        $applied = 0;
+        $skipped = 0;
+        $failed  = [];
+
+        foreach ($targets as $rel) {
+            // Re-checked per file, immediately before writing: another tab or
+            // a manual upload may have put it there in the meantime, and this
+            // action promises never to replace an existing file.
+            if (is_file($root . '/' . $rel)) {
+                $skipped++;
+                continue;
+            }
+
+            $result = self::applyPendingView($rel);
+            if ($result['success']) {
+                $applied++;
+                continue;
+            }
+            $failed[] = $rel . ' — ' . $result['message'];
+        }
+
+        $message = $applied === 1
+            ? '1 missing file restored.'
+            : $applied . ' missing files restored.';
+
+        if ($skipped > 0) {
+            $message .= ' ' . $skipped . ' already existed and were left alone.';
+        }
+        if ($failed !== []) {
+            $message .= ' ' . count($failed) . ' could not be written: ' . implode('; ', $failed);
+        }
+
+        return [
+            'success' => $failed === [] && $applied > 0,
+            'applied' => $applied,
+            'skipped' => $skipped,
+            'failed'  => $failed,
+            'message' => $message,
+        ];
+    }
+
     /** Move staged views out of the extracted package into storage/. */
     private static function stageViews(string $staging): int
     {

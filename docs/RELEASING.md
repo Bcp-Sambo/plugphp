@@ -220,6 +220,9 @@ defaults, and never rename or drop a column that shipped code still reads.
 - [ ] `php tools/test-safe-paths.php` passes. Always — not only when
       `SAFE_PATTERNS` changed. It is the allowlist the whole feature rests on,
       it needs no database or network, and it takes a moment.
+- [ ] `php tools/test-bulk-apply.php` passes if anything in the reference-file
+      or apply path changed. It works on a copy of the tree in a temp
+      directory and needs no database.
 - [ ] `php tools/test-http.php` passes if `core/Http.php` or any gateway call
       changed. It generates its own certificate authority and needs no network
       access; the third section must FAIL to connect, which is what proves

@@ -478,6 +478,35 @@ Write migrations so older code tolerates the newer schema.
 Backups live in `storage/backups/`, capped at the 3 most recent, and the
 rollback button is offered for 7 days.
 
+**Reference files — the ones an update may never install.** Views,
+`resources/`, the `.htaccess` files: a release carries them under a separate
+prefix, the updater drops them in `storage/pending-views/`, and the admin
+applies them from the dashboard. `referenceStatus()` classifies each one
+against three inputs — what the site has, what it had before its last update,
+and what this release ships — so a file the owner customised is never confused
+with one that is merely old:
+
+```php
+Updater::referenceStatus();        // [['file','status','staged','effect'], …]
+Updater::applyPendingView($rel);   // one file, backing up the current version
+Updater::applyAllMissing();        // every MISSING file, in one action
+```
+
+`applyAllMissing()` is scoped to `missing` and nothing else. A missing file has
+no local version to lose, so one confirmation for the batch is an honest
+trade — enabling a new module leaves a dozen views missing at once, and
+applying them one click at a time is a bad first experience for no safety
+benefit. `behind`, `conflict` and `unknown` stay one file at a time on purpose:
+each of those can overwrite something the owner wrote, and the per-file
+decision *is* the protection. It derives its own list rather than trusting the
+page, so a file that reappeared in the meantime is never in the batch, and
+each file still goes through `applyPendingView()` so there is one write path,
+not a faster looser one.
+
+`tools/test-bulk-apply.php` exercises this against a throwaway copy of the
+tree — it is the only path that writes into a live site's own directories, so
+it is not tested against a working checkout.
+
 ---
 ## ModuleManager
 

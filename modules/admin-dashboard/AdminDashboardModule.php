@@ -560,7 +560,31 @@ final class AdminDashboardModule extends Module
             }
             $total += count($items);
             $body .= '<p class="pp-stale__h"><strong>' . e($heading[$status]) . '</strong><br>'
-                . e($blurb[$status]) . '</p><ul>';
+                . e($blurb[$status]) . '</p>';
+
+            // One button for the whole group, but ONLY for missing files —
+            // they have no local version to lose, so a single confirmation is
+            // an honest trade. The other groups can overwrite the owner's own
+            // work, and there the per-file decision is the protection.
+            // Enabling a new module is what makes this worth having: every
+            // one of its views is missing at once.
+            if ($status === Updater::FILE_MISSING && $canApply) {
+                $applyable = count(array_filter($items, fn($r) => (bool) $r['staged']));
+
+                if ($applyable > 1) {
+                    $body .= '<form method="post" action="' . url('/admin/views/apply-all') . '"'
+                        . ' class="pp-stale__act" data-confirm-bulk="'
+                        . e('Restore ' . $applyable . ' missing file(s)? Nothing you have changed is '
+                            . 'touched — only files that are absent get written.') . '">'
+                        . '<input type="hidden" name="csrf_token" value="' . e($csrf) . '">'
+                        . '<button class="btn btn-primary btn-sm" type="submit">'
+                        . e('Restore all ' . $applyable . ' missing files')
+                        . '</button>'
+                        . '</form>';
+                }
+            }
+
+            $body .= '<ul>';
 
             foreach ($items as $row) {
                 $file = (string) $row['file'];
@@ -618,7 +642,49 @@ final class AdminDashboardModule extends Module
             . '.pp-stale p{margin:.4rem 0}'
             . '.pp-stale__h{margin-top:.9rem}'
             . '.pp-stale__act{margin-top:.35rem}'
-            . '</style>';
+            . '</style>'
+            . self::bulkApplyConfirmScript();
+    }
+
+    /**
+     * The confirmation for the bulk restore button.
+     *
+     * This notice renders on EVERY admin page, while the script that handles
+     * `data-confirm` lives inside views/updates.php and therefore only runs on
+     * the Updates screen. A `data-confirm` here would silently do nothing
+     * everywhere else — which is the same class of bug as the inline
+     * `onsubmit` handlers the CSP used to swallow, where both buttons fired
+     * with no prompt at all.
+     *
+     * So the notice carries its own. The attribute is deliberately named
+     * `data-confirm-bulk`, which views/updates.php does NOT select, so on the
+     * Updates page the form is bound once and prompts once. If those two
+     * scripts are ever unified, drop this one rather than leaving both.
+     *
+     * The nonce is required: the CSP permits inline script only by nonce,
+     * never 'unsafe-inline'. And if the script does not run at all, the form
+     * still submits and still only writes files that are absent — the
+     * confirmation is a courtesy here, not the safety mechanism.
+     */
+    private static function bulkApplyConfirmScript(): string
+    {
+        if (!class_exists('View')) {
+            return '';
+        }
+
+        return '<script' . View::nonceAttribute() . '>'
+            . '(function(){'
+            . 'var f=document.querySelectorAll(".pp-stale form[data-confirm-bulk]");'
+            . 'Array.prototype.forEach.call(f,function(form){'
+            . 'form.addEventListener("submit",function(e){'
+            . 'if(!window.confirm(form.getAttribute("data-confirm-bulk"))){e.preventDefault();return;}'
+            . 'var b=form.querySelector("button[type=submit]");'
+            . 'if(!b){return;}'
+            . 'if(b.disabled){e.preventDefault();return;}'
+            . 'b.disabled=true;b.setAttribute("aria-busy","true");b.textContent="Restoring…";'
+            . '});});'
+            . '})();'
+            . '</script>';
     }
 
     /* ------------------------------------------------------------------ *
@@ -701,6 +767,44 @@ final class AdminDashboardModule extends Module
         header('Location: ' . $target);
         exit;
     }
+
+    /**
+     * POST /admin/views/apply-all — restore every delivered file that is
+     * missing from this site, in one go.
+     *
+     * Administrator only, CSRF-guarded, and scoped to `missing` by
+     * Updater::applyAllMissing() — never to a file that exists, whether the
+     * owner customised it or not. Enabling a new module leaves a dozen files
+     * missing at once, and applying them one click at a time is the bad first
+     * experience this removes; everything that could overwrite somebody's
+     * work stays one file and one decision at a time.
+     */
+    public static function applyAllMissingViews(): void
+    {
+        Auth::requireLogin();
+        Auth::requireRole(Auth::ROLE_ADMIN);
+        Auth::requireCsrf($_POST['csrf_token'] ?? null);
+
+        $result = Updater::applyAllMissing();
+
+        // A partial result is reported as a failure with the full detail, not
+        // as a success with a footnote: "11 of 12 restored" needs the one that
+        // did not land to be the part that gets read.
+        $_SESSION['pp_settings_flash'] = [
+            'errors'  => $result['success'] ? [] : [$result['message']],
+            'success' => $result['success'] ? $result['message'] : '',
+        ];
+
+        $back = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+        $target = (str_starts_with($back, '/') && !str_starts_with($back, '//'))
+            ? $back
+            : Url::to('/admin/updates');
+
+        http_response_code(302);
+        header('Location: ' . $target);
+        exit;
+    }
+
     /** The enabled-module list, same source of truth the bootstrap uses. */
     private static function enabledModules(): array
     {
