@@ -97,6 +97,38 @@ $router->post('/admin/settings/tracking', function (): void {
     AdminDashboardModule::saveTracking();
 });
 
+/* ------------------------------------------------------------------ *
+ * Module Management — the only place modules are turned on or off after
+ * install. Administrator only; every write is POST + CSRF + audit-logged.
+ * ------------------------------------------------------------------ */
+
+$router->get('/admin/modules', function (): void {
+    Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
+    AdminDashboardModule::modulesPage();
+});
+
+$router->post('/admin/modules/enable', function (): void {
+    Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::moduleAction('enable');
+});
+
+$router->post('/admin/modules/disable', function (): void {
+    Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::moduleAction('disable');
+});
+
+$router->post('/admin/modules/remove', function (): void {
+    Auth::requireLogin();
+    Auth::requireRole(Auth::ROLE_ADMIN);
+    Auth::requireCsrf($_POST['csrf_token'] ?? null);
+    AdminDashboardModule::moduleAction('remove');
+});
+
 $router->post('/admin/views/apply', function (): void {
     // Guards live in the handler; see AdminDashboardModule::applyView().
     AdminDashboardModule::applyView();

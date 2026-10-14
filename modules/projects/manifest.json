@@ -1,0 +1,22 @@
+{
+    "module": "projects",
+    "version": "1.0.0",
+    "db_tables_owned": [
+        "projects"
+    ],
+    "handles_file_uploads": true,
+    "network_access": [],
+    "sends_email": false,
+    "admin_routes": [
+        "/admin/projects",
+        "/admin/projects/new",
+        "/admin/projects/visibility",
+        "/admin/projects/{id}",
+        "/admin/projects/{id}/delete",
+        "/admin/projects/{id}/edit"
+    ],
+    "public_routes": [
+        "/projects",
+        "/projects/{slug}"
+    ]
+}

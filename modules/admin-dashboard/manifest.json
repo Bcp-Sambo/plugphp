@@ -1,0 +1,23 @@
+{
+    "module": "admin-dashboard",
+    "version": "1.0.0",
+    "db_tables_owned": [],
+    "handles_file_uploads": true,
+    "network_access": [],
+    "sends_email": true,
+    "admin_routes": [
+        "/admin",
+        "/admin/settings",
+        "/admin/settings/branding",
+        "/admin/settings/smtp",
+        "/admin/settings/test-email",
+        "/admin/settings/tracking",
+        "/admin/updates",
+        "/admin/updates/apply",
+        "/admin/updates/check",
+        "/admin/updates/finish",
+        "/admin/updates/rollback",
+        "/admin/views/apply"
+    ],
+    "public_routes": []
+}

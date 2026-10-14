@@ -67,3 +67,14 @@ Replies go through `Mailer::send()`, never an ad hoc mail path. Both the
 reply text and the quoted original are escaped with `e()` before going into
 the HTML body — the reply is written by an admin and the original by a
 member of the public, and neither is trustworthy markup.
+
+## manifest.json
+
+This module declares what it touches in `manifest.json` — tables owned, whether
+it sends email, accepts uploads or makes network calls, and the routes it owns.
+The installer's picker and `/admin/modules` both show it.
+
+**Keep it in step with the code.** If you add a table, an upload, an outbound
+request or a route here, update `manifest.json` in the same change. It is a
+declaration, not an enforced restriction — nothing stops this module doing more
+than it says, which is exactly why a stale one is worse than none.

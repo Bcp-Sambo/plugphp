@@ -1,0 +1,23 @@
+{
+    "module": "auth",
+    "version": "1.0.0",
+    "db_tables_owned": [
+        "users",
+        "password_resets"
+    ],
+    "handles_file_uploads": false,
+    "network_access": [],
+    "sends_email": true,
+    "admin_routes": [
+        "/admin/users",
+        "/admin/users/{id}/delete",
+        "/admin/users/{id}/role"
+    ],
+    "public_routes": [
+        "/forgot-password",
+        "/login",
+        "/logout",
+        "/register",
+        "/reset-password"
+    ]
+}

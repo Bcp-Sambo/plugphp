@@ -210,21 +210,58 @@ model it on [`blog/SKILL.md`](../modules/blog/SKILL.md). Minimum contents:
   "escape body on output", "uploads go through `Upload::image`".
 - **Visibility toggle / dashboard nav**, if the module has them.
 
-## 7. Install / enable it
+## 7. The manifest.json
 
-Modules are enabled at install time and listed in `config/modules.php`. To pick
-up a new module:
+Every module ships one, next to its `SKILL.md`:
 
-- **Fresh install:** it appears in the installer's module picker automatically
-  (by its `label()`), and its migrations run when selected.
-- **Existing site:** add its name to `config/modules.php`, then apply its
-  migration to the database yourself (e.g. run the `.sql` in phpMyAdmin). There
-  is no runtime migration runner — the installer only runs on first install.
-
-```php
-// config/modules.php
-return ['home','about','services','projects','blog','notes','contact-form','auth','admin-dashboard'];
+```json
+{
+  "module": "notes",
+  "version": "1.0.0",
+  "changelog": null,
+  "db_tables_owned": ["notes"],
+  "handles_file_uploads": false,
+  "network_access": [],
+  "sends_email": false,
+  "admin_routes": ["/admin/notes"],
+  "public_routes": ["/notes"]
+}
 ```
+
+`module` must match the folder name — a manifest claiming to be a different
+module is refused rather than trusted. The installer's picker and
+`/admin/modules` both show this, so someone deciding whether to switch your
+module on can see what it touches.
+
+Keep it current. It is the reference an audit checks your code against, and a
+manifest that has drifted from reality is worse than none because it is
+believed. Bump `version` when the module changes and put a one-line
+`changelog` beside it — that is what `/admin/updates` shows as
+"Notes 1.0 → 1.1 — adds tagging".
+
+**It is a declaration, not a sandbox.** Nothing enforces it at runtime, and
+nothing stops a module doing more than it says. Do not describe it as isolation.
+
+## 8. Enable it
+
+Modules are listed in `config/modules.php`, which no update ever touches.
+
+- **Fresh install:** your module appears in the installer's picker
+  automatically (by its `label()`), with its declared capabilities beside it.
+  Its migrations run when selected.
+- **Existing site:** go to **`/admin/modules`**, find it in the list, and press
+  **Enable**. It is added to `config/modules.php` and **its migrations run at
+  that moment** — nothing to run by hand.
+
+Do not tell anyone to hand-edit `config/modules.php`. That was the only option
+before `/admin/modules` existed, and it is exactly what that screen replaced.
+
+A module that ships in a release does **not** activate itself. It sits in
+`/admin/modules` as "Disabled" until an administrator turns it on, which is why
+a new module arriving in core never changes an existing site's behaviour.
+
+`home`, `admin-dashboard` and `auth` can never be disabled — without them there
+is no login and no dashboard, so there would be no way back in.
 
 ## Checklist
 
@@ -236,3 +273,6 @@ return ['home','about','services','projects','blog','notes','contact-form','auth
 - [ ] Every dynamic value in a view is wrapped in `e()`.
 - [ ] Uploads (if any) go through `Upload::image()`.
 - [ ] `SKILL.md` documents schema, routes, and rules.
+- [ ] `manifest.json` exists, `module` matches the folder, and what it declares
+      is what the code actually does.
+- [ ] The module is listed at `/admin/modules` and enabling it creates its tables.

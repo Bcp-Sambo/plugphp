@@ -81,6 +81,30 @@ foreach ($preflight as $c) {
                 </a> before you update.
             <?php endif; ?>
         </p>
+
+        <?php $moduleChanges = Updater::moduleChanges($manifest); ?>
+        <?php if ($moduleChanges !== []): ?>
+            <p class="muted">What this release changes in the modules on your site:</p>
+            <ul class="pp-modchanges">
+            <?php foreach ($moduleChanges as $c): ?>
+                <li>
+                    <strong><?= e(ucfirst(str_replace('-', ' ', $c['module']))) ?></strong>
+                    <?php if ($c['status'] === 'new'): ?>
+                        <span class="pp-modchanges__new">new in <?= e($c['to']) ?></span>
+                    <?php elseif ($c['from'] !== ''): ?>
+                        <?= e($c['from']) ?> &rarr; <?= e($c['to']) ?>
+                    <?php else: ?>
+                        <?= e($c['to']) ?>
+                    <?php endif; ?>
+                    <?php if ($c['changelog'] !== null): ?>
+                        — <?= e($c['changelog']) ?>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+            <p class="muted">Modules not listed are unchanged in this release. Updates still
+               ship as one release — this is only a breakdown of what is in it.</p>
+        <?php endif; ?>
     <?php else: ?>
         <p>You are on the latest version.</p>
     <?php endif; ?>
@@ -192,6 +216,10 @@ foreach ($preflight as $c) {
 @media (prefers-reduced-motion: reduce) { .pp-spin { animation:none; opacity:.6; } }
 .pp-working { margin:.6rem 0 0; font-size:13px; color:#5b6270; }
 button[disabled] { opacity:.75; cursor:progress; }
+.pp-modchanges{margin:.4rem 0 .6rem 1.1rem;padding:0;font-size:13.5px}
+.pp-modchanges li{margin:.2rem 0}
+.pp-modchanges__new{background:#ECFDF5;color:#065F46;font-size:11.5px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.03em;padding:.1rem .4rem;border-radius:999px}
 </style>
 
 <script nonce="<?= e(View::nonce()) ?>">

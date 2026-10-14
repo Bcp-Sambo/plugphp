@@ -1,0 +1,22 @@
+{
+    "module": "blog",
+    "version": "1.0.0",
+    "db_tables_owned": [
+        "posts"
+    ],
+    "handles_file_uploads": true,
+    "network_access": [],
+    "sends_email": false,
+    "admin_routes": [
+        "/admin/blog",
+        "/admin/blog/new",
+        "/admin/blog/visibility",
+        "/admin/blog/{id}",
+        "/admin/blog/{id}/delete",
+        "/admin/blog/{id}/edit"
+    ],
+    "public_routes": [
+        "/blog",
+        "/blog/{slug}"
+    ]
+}

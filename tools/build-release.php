@@ -24,6 +24,7 @@
  */
 
 require_once __DIR__ . '/../core/Updater.php';
+require_once __DIR__ . '/../core/Module.php';
 
 $argvv = $argv ?? [];
 array_shift($argvv);
@@ -125,6 +126,7 @@ foreach ((array) glob("$root/modules/*", GLOB_ONLYDIR) as $dir) {
     foreach ((array) glob("$dir/*Module.php") as $f)           { $candidates[] = "modules/$m/" . basename($f); }
     if (is_file("$dir/routes.php"))                            { $candidates[] = "modules/$m/routes.php"; }
     foreach ((array) glob("$dir/migrations/*.sql") as $f)      { $candidates[] = "modules/$m/migrations/" . basename($f); }
+    if (is_file("$dir/manifest.json"))                         { $candidates[] = "modules/$m/manifest.json"; }
 }
 
 sort($candidates);
@@ -197,9 +199,32 @@ if (!$zip->close()) {
 $sha = hash_file('sha256', $zipPath);
 $repo = 'Bcp-Sambo/plugphp';
 
+/* ------------------------------------------------------------------ *
+ * Per-module versions.
+ *
+ * One unified release still, exactly as before — this is visibility into what
+ * a release contains, not separate per-module update channels. A site showing
+ * "Blog unchanged, Ecommerce 1.1 -> 1.2, adds shipping zones" tells its owner
+ * whether the update touches anything they actually use; one opaque banner
+ * does not.
+ * ------------------------------------------------------------------ */
+$moduleVersions = [];
+foreach ((array) glob("$root/modules/*", GLOB_ONLYDIR) as $dir) {
+    $m = Module::manifestFor(basename($dir));
+    if ($m === null || $m['version'] === '') {
+        continue;
+    }
+    $moduleVersions[$m['module']] = [
+        'version'   => $m['version'],
+        'changelog' => $m['changelog'],
+    ];
+}
+ksort($moduleVersions);
+
 $manifest = [
     'version'           => $version,
     'security_advisory' => $security,
+    'modules'           => $moduleVersions,
     'changelog_url'     => "https://github.com/$repo/releases/tag/v$version",
     'download_url'      => "https://github.com/$repo/releases/download/v$version/plugphp-update-$version.zip",
     'sha256'            => $sha,
@@ -210,6 +235,7 @@ file_put_contents("$outDir/version.json",
 
 printf("Built %s\n", basename($zipPath));
 printf("  files   %d code, %d reference file(s)\n", count($include), count($views));
+printf("  modules %d version(s) declared\n", count($moduleVersions));
 if ($wide) {
     printf("  NOTE    --wide: this package stages the full reference set.\n");
     printf("          Sites older than 1.5.0 REJECT such a package whole.\n");

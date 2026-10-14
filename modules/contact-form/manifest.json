@@ -1,0 +1,18 @@
+{
+    "module": "contact-form",
+    "version": "1.0.0",
+    "db_tables_owned": [
+        "contact_submissions"
+    ],
+    "handles_file_uploads": false,
+    "network_access": [],
+    "sends_email": true,
+    "admin_routes": [
+        "/admin/messages",
+        "/admin/messages/{id}",
+        "/admin/messages/{id}/reply"
+    ],
+    "public_routes": [
+        "/contact"
+    ]
+}
