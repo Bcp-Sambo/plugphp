@@ -112,6 +112,99 @@ final class Database
     }
 
     /**
+     * Run $fn inside a single database transaction.
+     *
+     * Commits when the callable returns, rolls back and rethrows if it
+     * throws. The callable's return value is passed through, so a handler can
+     * compute inside the transaction and use the result after it.
+     *
+     *     $orderId = Database::transaction(function () use ($cart) {
+     *         $row = Database::fetchOne(
+     *             'SELECT stock_quantity FROM products WHERE id = :id FOR UPDATE',
+     *             ['id' => $cart['product_id']]
+     *         );
+     *         // ... check stock, insert the hold, return the id
+     *     });
+     *
+     * WHY THIS EXISTS, AND WHY IT IS NOT OPTIONAL: `SELECT ... FOR UPDATE`
+     * outside a transaction takes a row lock that autocommit releases the
+     * instant the statement finishes. Two buyers then both read the same
+     * "1 left" and both proceed. The code looks correct, passes every
+     * single-request test, and oversells only under concurrent load — which
+     * is exactly when it costs money. A FOR UPDATE read that is not wrapped
+     * in this method is not protecting anything.
+     *
+     * AI AGENTS: this is a named primitive, not a general SQL escape hatch.
+     * It runs YOUR closure; it does not take SQL. The rule against adding a
+     * raw executor to this class is unchanged.
+     *
+     * Two things this deliberately does NOT do:
+     *
+     * - **It does not nest.** A second call while a transaction is open
+     *   throws rather than quietly joining the outer one, because the two
+     *   possible meanings (one shared transaction, or independent inner
+     *   savepoints) behave differently on rollback and the caller cannot see
+     *   which it got. No call site in this project needs nesting; if one ever
+     *   genuinely does, add SAVEPOINT handling here with its own test rather
+     *   than relaxing this check.
+     * - **It must not contain DDL.** MySQL commits implicitly on CREATE,
+     *   ALTER and DROP, which would end the transaction mid-closure while
+     *   this method still believes it is open. Never call
+     *   runMigrationFile() — or anything that migrates — from inside here.
+     */
+    public static function transaction(callable $fn): mixed
+    {
+        $pdo = self::connection();
+
+        if ($pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Database::transaction() does not nest: a transaction is already open on this '
+                . 'connection. Restructure so the outermost caller owns the transaction and the '
+                . 'inner work is a plain function.'
+            );
+        }
+
+        $pdo->beginTransaction();
+
+        try {
+            $result = $fn();
+        } catch (Throwable $e) {
+            // A rollback can itself fail — a dropped connection is the usual
+            // reason. The original exception is what the caller needs to see,
+            // so the rollback failure goes to the error log instead of
+            // replacing it.
+            try {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+            } catch (Throwable $rollbackFailure) {
+                error_log(
+                    'Database::transaction() rollback failed after an error: '
+                    . $rollbackFailure->getMessage()
+                );
+            }
+            throw $e;
+        }
+
+        // The closure is not supposed to commit or roll back on its own. If it
+        // did, commit() below would throw a confusing "no active transaction"
+        // from inside this method; say what actually happened instead.
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'The callable passed to Database::transaction() closed the transaction itself. '
+                . 'Let this method own the commit and rollback.'
+            );
+        }
+
+        // Outside the try: a commit that fails is not a rolled-back
+        // transaction, and must not be reported as one. It propagates as-is,
+        // and the caller must treat the work as not done.
+        $pdo->commit();
+
+        return $result;
+    }
+
+    /**
      * Run a migration SQL file exactly once.
      *
      * Migrations are trusted files shipped with the kit, never user input.

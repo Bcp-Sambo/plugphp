@@ -117,13 +117,35 @@ accept 1.6.0, let alone a later one.
 
 ### Phase A — core plumbing (1.7.0, no ecommerce code)
 
-1. `Database::transaction(callable $fn): mixed` — begin/commit/rollback around
-   a closure, rethrowing after rollback. A specific method, not a raw executor;
-   `SKILL.md`'s rule forbids generalising into a raw SQL runner, not adding a
-   named primitive.
-2. Prove it: a test that runs two concurrent checkouts against one unit of
-   stock and asserts exactly one wins. **Write this before the checkout code** —
-   it is the only way to know `FOR UPDATE` is really locking.
+**Status:** items 1 and 2 are **done** — `Database::transaction()` is in
+`core/Database.php:155` and `tools/test-stock-locking.php` proves it. Items
+3–6 remain.
+
+1. ~~`Database::transaction(callable $fn): mixed`~~ **done.**
+   Begin/commit/rollback around a closure, rethrowing after rollback, return
+   value passed through. A specific method, not a raw executor; `SKILL.md`'s
+   rule forbids generalising into a raw SQL runner, not adding a named
+   primitive. Deliberately refuses to nest (the two possible meanings differ
+   on rollback and the caller cannot tell which it got), and must not contain
+   DDL, which MySQL commits implicitly.
+2. ~~Prove it~~ **done.** `tools/test-stock-locking.php` races two real
+   processes — the PDO handle is a per-process singleton, so one process
+   cannot hold two competing connections — against one unit of stock, on a
+   shared start timestamp. Three sections: the wrapper's contract, the
+   guarded race, and an **unguarded control that is expected to oversell**.
+   The control is what makes the guarded pass meaningful: a clean control
+   means the two workers never collided. Verified to fail when
+   `transaction()` is sabotaged into a passthrough.
+
+   **What the control revealed, and it changes item 24.** Both unguarded
+   workers wrote the *absolute* stock they computed from a stale read
+   (`1 - 1 = 0`), so the counter landed on a perfectly plausible `0` while
+   two claims existed. An oversell leaves **no trace in the stock number** —
+   only the duplicate rows show it. So the real decrement must be relative
+   (`stock_quantity = stock_quantity - :n`), where the same bug would leave
+   `-1` behind as evidence. `Database::update()` cannot express that; it takes
+   literal values, so this needs its own named method in `Database` when
+   Phase E is built.
 3. `core/Http.php` — `postJson($url, $payload, $headers, $timeout)` and
    `getJson(...)`. TLS verification on, no redirects followed by default, a
    byte cap, and no secret ever written to a log.
@@ -197,7 +219,12 @@ accept 1.6.0, let alone a later one.
 22. Idempotency by current status — already `paid` means do nothing.
 23. "Re-verify payment" button for pending orders with a reference.
 24. On confirmed payment: convert holds to real `stock_quantity` decrements,
-    delete the holds, set `paid`, send the customer email.
+    delete the holds, set `paid`, send the customer email. The decrement is
+    **relative** (`stock_quantity = stock_quantity - :n`), not a computed
+    absolute value — see Phase A item 2: an absolute write hides an oversell
+    behind a plausible-looking counter, while a relative one leaves a negative
+    number as evidence. Needs a named method on `Database`; `update()` only
+    takes literal values.
 
 ### Phase F — orders, email, docs
 
@@ -443,9 +470,14 @@ load-bearing; the symbol riding along with it is the cheap half.
 
 ## 6. Definition of Done — additions to §10
 
-- [ ] A **concurrency test** proves `Database::transaction()` + `FOR UPDATE`
+- [x] A **concurrency test** proves `Database::transaction()` + `FOR UPDATE`
       actually serialises: two simultaneous checkouts, one unit, exactly one
-      winner. Without this the spec's §9 stock guarantee is unverified.
+      winner. `tools/test-stock-locking.php`, passing, with an unguarded
+      control that reproduces the oversell and a verified ability to fail.
+- [ ] The test is re-run against the **real** checkout once §4.2 exists —
+      Phase A proved the primitive on a probe table, not the checkout path.
+- [ ] Stock decrements are relative, never computed absolutes (item 24), so
+      that an oversell leaves evidence instead of a plausible counter.
 - [ ] A release containing `modules/*/Gateways/*.php` is **accepted** by a site
       running the previous release.
 - [ ] Enabling ecommerce on an existing site yields working pages — every view

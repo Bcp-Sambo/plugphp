@@ -24,6 +24,14 @@ read the relevant one before touching that module.
    reaching for `PDO`/`mysqli` directly — there is deliberately no raw-query
    method available.
 
+   `Database::transaction(callable $fn)` wraps several of those calls in one
+   transaction, committing on return and rolling back on any exception. It
+   runs your closure and takes no SQL of its own, so it is not a way around
+   the rule above. Anything reading `SELECT ... FOR UPDATE` **must** be inside
+   it: on autocommit that lock is released as soon as the SELECT finishes, and
+   two simultaneous buyers will both read the same last unit in stock. It does
+   not nest, and must not contain migrations or any other DDL.
+
 2. **Never `echo` a dynamic value without wrapping it in `e()`.** Every view
    file has access to the global `e()` helper (`core/View.php`). This is the
    only approved way to print user- or database-sourced content into HTML.

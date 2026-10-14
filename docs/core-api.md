@@ -50,10 +50,34 @@ $deleted = Database::delete('posts', 'id', $id);                       // rows a
 
 // Migrations (trusted files only — never user input)
 Database::runMigrationFile(__DIR__ . '/migrations/001_create_posts.sql');
+
+// One transaction around several statements. Commits on return, rolls back
+// and rethrows on any exception, and passes the return value through.
+$orderId = Database::transaction(function () use ($productId) {
+    $row = Database::fetchOne(
+        'SELECT stock_quantity FROM products WHERE id = :id FOR UPDATE',
+        ['id' => $productId]
+    );
+    // ... decide from $row, then write
+    return Database::insert('orders', [/* ... */]);
+});
 ```
 
 Rules and gotchas:
 
+- **`SELECT ... FOR UPDATE` only means something inside
+  `Database::transaction()`.** On autocommit the row lock is released the
+  instant the SELECT finishes, so two requests both read the same "1 left"
+  and both proceed. The code looks right and oversells only under concurrent
+  load. `tools/test-stock-locking.php` demonstrates both outcomes against a
+  real database — run it if you are changing anything in this area.
+- **`transaction()` does not nest.** A second call while one is open throws
+  rather than quietly joining the outer transaction. Restructure so the
+  outermost caller owns the transaction; add `SAVEPOINT` support (with its
+  own test) only if a real call site ever needs it.
+- **No DDL inside `transaction()`.** MySQL commits implicitly on `CREATE`,
+  `ALTER` and `DROP`, which ends the transaction mid-closure while the method
+  still believes it is open. Never call `runMigrationFile()` from inside one.
 - **Bind every value.** Pass user/DB values as named params (`:id`), never
   string-concatenate them into SQL.
 - `insert`/`update`/`delete` validate table and column names against

@@ -204,3 +204,8 @@ defaults, and never rename or drop a column that shipped code still reads.
 - [ ] Rolled that scratch install back and confirmed the previous code returned.
 - [ ] Release notes name any manual step the updater cannot perform for the
       owner (a view change, a dependency bump, an `.htaccess` edit).
+- [ ] `php tools/test-stock-locking.php` passes against a development database
+      if anything under `core/Database.php` or any stock-locking path changed.
+      It must report PASS on all three sections — the unguarded control is
+      expected to oversell, and a *clean* control means the race never
+      collided and the guarded result proved nothing.
