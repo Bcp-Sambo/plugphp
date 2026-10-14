@@ -1,5 +1,5 @@
 {
-    "version": "1.6.0",
+    "version": "1.7.0",
     "security_advisory": false,
     "modules": {
         "about": {
@@ -35,7 +35,7 @@
             "changelog": null
         }
     },
-    "changelog_url": "https://github.com/Bcp-Sambo/plugphp/releases/tag/v1.6.0",
-    "download_url": "https://github.com/Bcp-Sambo/plugphp/releases/download/v1.6.0/plugphp-update-1.6.0.zip",
-    "sha256": "0f04bd65aaebbdce5dec284da9bcd8a8ad1220ba8c167f3266e01ee0c3d87786"
+    "changelog_url": "https://github.com/Bcp-Sambo/plugphp/releases/tag/v1.7.0",
+    "download_url": "https://github.com/Bcp-Sambo/plugphp/releases/download/v1.7.0/plugphp-update-1.7.0.zip",
+    "sha256": "ef38aee13ee47c5b86bb830446aa28f855998c61717e427466738e592df2033f"
 }
