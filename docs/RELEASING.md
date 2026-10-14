@@ -220,6 +220,10 @@ defaults, and never rename or drop a column that shipped code still reads.
 - [ ] `php tools/test-safe-paths.php` passes. Always — not only when
       `SAFE_PATTERNS` changed. It is the allowlist the whole feature rests on,
       it needs no database or network, and it takes a moment.
+- [ ] `php tools/test-throttle.php` passes against a development database if
+      `core/Throttle.php` or any rate-limited path changed. The three
+      "Throttle … failed" lines in its last section are expected — that is the
+      fail-open path proving it still logs.
 - [ ] `php tools/test-bulk-apply.php` passes if anything in the reference-file
       or apply path changed. It works on a copy of the tree in a temp
       directory and needs no database.

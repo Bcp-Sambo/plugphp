@@ -336,6 +336,28 @@ secret-leak primitive, and no gateway API needs it.
 `tools/test-http.php` proves all of the above against a real TLS server with
 a throwaway certificate authority. Run it after touching `core/Http.php`.
 
+## Rate limiting
+
+`core/Throttle.php` is the shared counter. Use it for anything that needs a
+cap before the row it would create exists:
+
+```php
+if (Throttle::isLimited('checkout', 10, 3600)) { /* refuse, politely */ }
+Throttle::hit('checkout');
+```
+
+Check first, then record. The action name is yours to choose and must never
+come from user input.
+
+Do not copy Contact Form's pattern into a new module unless it genuinely
+applies: it counts rows in `contact_submissions`, which works only because
+the submission *is* the row being limited.
+
+**It is not a security control.** It fails open by design — a database problem
+must not become a site that refuses every visitor — so never leave something
+unguarded on the strength of it. `Auth::requireCsrf()`, `Auth::requireLogin()`
+and server-side revalidation are what protect an action.
+
 ## Tracking pixel IDs
 
 Tracking IDs are interpolated **inside an inline `<script>` block**. `e()` does

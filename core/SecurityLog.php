@@ -107,8 +107,15 @@ final class SecurityLog
      * Proxy headers are deliberately NOT consulted. On shared hosting anyone
      * can set X-Forwarded-For, so reading it would let the person being
      * audited choose what the audit records.
+     *
+     * Public because Throttle buckets its counters by the same value. "What
+     * is the caller's address, and which sources are trustworthy" is a
+     * security-relevant definition, and two copies of it is one copy too
+     * many: a second reader that consulted X-Forwarded-For would let a
+     * visitor pick their own rate-limit bucket while the audit log kept
+     * recording the real address. One definition, one answer.
      */
-    private static function clientIp(): ?string
+    public static function clientIp(): ?string
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
         return is_string($ip) && $ip !== '' ? substr($ip, 0, 45) : null;

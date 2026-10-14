@@ -231,7 +231,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // The migrations log must exist before anything else so every
             // migration below is recorded and never re-applied on a retry.
             Database::runMigrationFile(ROOT . '/core/migrations/000_create_migrations_log.sql');
-            Database::runMigrationFile(ROOT . '/core/migrations/000_create_site_settings.sql');
+
+            // EVERY core migration, discovered rather than listed.
+            //
+            // This used to name the two 000_* files explicitly, which meant a
+            // core migration added later never ran on a fresh install — it
+            // arrived only when the site eventually took an update. That is
+            // how a site installed in September ended up with no security_log
+            // table until an update in October created it, and it would have
+            // left request_throttle missing on every new site, so the rate
+            // limiter would have silently never limited anything.
+            //
+            // Sorted by filename, which is what the numeric prefixes are for.
+            // runMigrationFile() records each one and skips anything already
+            // applied, so re-running the installer after a failure part-way
+            // through is safe.
+            $coreMigrations = glob(ROOT . '/core/migrations/*.sql');
+            if (!is_array($coreMigrations)) {
+                $coreMigrations = array();
+            }
+            sort($coreMigrations);
+            foreach ($coreMigrations as $coreMigration) {
+                Database::runMigrationFile($coreMigration);
+            }
             foreach ($modules as $moduleName) {
                 $class = module_class($moduleName);
                 $file = ROOT . '/modules/' . $moduleName . '/' . $class . '.php';

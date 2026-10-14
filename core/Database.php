@@ -112,6 +112,31 @@ final class Database
     }
 
     /**
+     * Delete rows in $table whose $timestampColumn is strictly older than
+     * $cutoff. Returns the number of rows removed.
+     *
+     * A separate method rather than a parameter on delete(), which matches a
+     * single `column = value` and cannot express a range. This is the shape
+     * the class header asks for: a new specific method with its own bound
+     * parameters, not a general executor that takes an operator.
+     *
+     * For pruning expiring data — rate-limit counters, stock holds — where
+     * there is no cron on this hosting and the sweep has to ride a normal
+     * request.
+     */
+    public static function deleteOlderThan(string $table, string $timestampColumn, string $cutoff): int
+    {
+        self::assertSafeIdentifier($table);
+        self::assertSafeIdentifier($timestampColumn);
+
+        $sql = "DELETE FROM {$table} WHERE {$timestampColumn} < :cutoff";
+        $stmt = self::connection()->prepare($sql);
+        $stmt->execute(['cutoff' => $cutoff]);
+
+        return $stmt->rowCount();
+    }
+
+    /**
      * Run $fn inside a single database transaction.
      *
      * Commits when the callable returns, rolls back and rethrows if it

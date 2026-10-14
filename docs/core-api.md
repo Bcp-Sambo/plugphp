@@ -8,7 +8,7 @@ Every class is `final` and uses static methods (no instances to wire up).
 
 - [Config](#config) · [Database](#database) · [Auth](#auth) · [View & `e()`](#view--e)
 - [Router](#router) · [Module](#module) · [Settings](#settings) · [Mailer](#mailer) · [Upload](#upload)
-- [Http](#http) · [Crypto](#crypto) · [Updater](#updater) · [SecurityLog](#securitylog)
+- [Http](#http) · [Throttle](#throttle) · [Crypto](#crypto) · [Updater](#updater) · [SecurityLog](#securitylog)
 
 ---
 
@@ -48,6 +48,10 @@ $rows = Database::fetchAll('SELECT id, title FROM posts WHERE published_at <= :n
 $id      = Database::insert('posts', ['title' => $t, 'slug' => $s]);   // returns last insert id (string)
 $changed = Database::update('posts', ['title' => $t], 'id', $id);      // rows affected (int)
 $deleted = Database::delete('posts', 'id', $id);                       // rows affected (int)
+
+// Delete rows older than a cutoff — the one range delete, for pruning
+// expiring data (rate-limit counters, stock holds). There is no cron here.
+$pruned = Database::deleteOlderThan('request_throttle', 'created_at', $cutoff);
 
 // Migrations (trusted files only — never user input)
 Database::runMigrationFile(__DIR__ . '/migrations/001_create_posts.sql');
@@ -658,3 +662,64 @@ deliberately untrusted to prove verification is really on.
 overwrite `core/`, so its host allowlist, redirect policy and byte cap are
 decided in the class that acts on them rather than inherited from a
 general-purpose helper something else might widen.
+
+---
+
+## Throttle
+
+`core/Throttle.php` — "has this address done this too many times lately?",
+over a shared `request_throttle` table keyed by an action name and the
+caller's IP.
+
+```php
+if (Throttle::isLimited('checkout', 10, 3600)) {
+    // show "too many attempts, try again later" and stop
+}
+Throttle::hit('checkout');          // count this attempt, then do the work
+
+Throttle::prune();                  // delete counters past the retention window
+```
+
+Check first, then record — recording before the check costs the caller their
+own first attempt. `$action` is an application-chosen label (`'checkout'`,
+`'login'`), **never user input**.
+
+**Why a table of its own.** Every other limit in this project counts the rows
+the action already wrote: Contact Form counts `contact_submissions`, password
+reset counts `password_resets`. That works because the submission *is* the
+row. Checkout has to be limited before an order exists, or the limit creates
+the junk orders it was added to prevent. `security_log` was the obvious
+shortcut and is the wrong answer — it records only actions that can turn a
+site's functionality on or off, precisely so it stays readable.
+
+**It is not a security control, and it fails open.** A failed write loses one
+count; a failed read returns "not limited" and the request proceeds. If this
+table is unreachable the database is unreachable and the action cannot
+complete anyway, so failing closed would convert a database problem into a
+site-wide refusal to serve anyone while protecting nothing — and a missing
+table is the normal state of a site mid-upgrade. Every swallowed error reaches
+the error log, so failing open is not failing silently. Authentication, CSRF
+and server-side revalidation are what actually guard an action.
+
+**Details worth knowing:**
+
+- A **rolling** window (rows newer than a cutoff), not a fixed bucket, so it
+  cannot be gamed by waiting for a period boundary.
+- An unreadable address is **not** limited, matching Contact Form: refusing to
+  serve a visitor whose address cannot be read is the worse failure. Nothing
+  is recorded for them either — a row with no address would be one shared
+  bucket for everybody.
+- The address comes from `SecurityLog::clientIp()`, the single definition of
+  what is trustworthy. Proxy headers are never consulted: a second reader that
+  honoured `X-Forwarded-For` would let a visitor pick their own bucket.
+- Timestamps are UTC (`gmdate`), stored and compared on one clock, so a
+  timezone change or DST cannot shift an hour of counters sideways.
+- `hit()` sweeps the table roughly one time in fifty, because there is no cron
+  on this hosting and relying on each caller to remember a sweep means the
+  first one that forgets grows the table forever. `prune()` stays public for
+  callers with a natural sweep point — the checkout prunes expired stock holds
+  on the same pass.
+
+`tools/test-throttle.php` covers it against a development database, and runs
+in a deliberately non-UTC timezone: on a UTC machine a version using local
+time passes every assertion.

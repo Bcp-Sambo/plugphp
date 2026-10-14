@@ -117,11 +117,18 @@ accept 1.6.0, let alone a later one.
 
 ### Phase A — core plumbing (1.7.0, no ecommerce code)
 
-**Status: Phase A is complete.** `Database::transaction()` in
-`core/Database.php:155` with `tools/test-stock-locking.php`, `core/Http.php`
-with `tools/test-http.php`, the widened `SAFE_PATTERNS` with
-`tools/test-safe-paths.php`, the bulk apply with `tools/test-bulk-apply.php`,
-and `core/Throttle.php` — item 6 — still to write before Phase D calls it.
+**Status: Phase A is complete.** All six items, each with a test that has
+been checked against a deliberately sabotaged version of the code it covers:
+
+| Item | Code | Test |
+|---|---|---|
+| 1–2 | `Database::transaction()` | `tools/test-stock-locking.php` |
+| 3 | `core/Http.php` | `tools/test-http.php` |
+| 4 | widened `SAFE_PATTERNS` | `tools/test-safe-paths.php` |
+| 5 | `Updater::applyAllMissing()` | `tools/test-bulk-apply.php` |
+| 6 | `core/Throttle.php` | `tools/test-throttle.php` |
+
+1.7.0 is ready to cut. Phase B can start.
 
 1. ~~`Database::transaction(callable $fn): mixed`~~ **done.**
    Begin/commit/rollback around a closure, rethrowing after rollback, return
@@ -223,10 +230,40 @@ and `core/Throttle.php` — item 6 — still to write before Phase D calls it.
      per-file one, not this. Applying a view turns functionality on, which is
      arguably what that log is for; it is left alone here rather than changed
      for one path and not the other. Worth deciding deliberately.
-6. Rate limiting: `core/Throttle.php` over a shared `request_throttle` table
-   keyed by action + IP, with `SecurityLog::clientIp()` promoted to public as
-   the single definition of the caller's address (§5.1). Checkout runs at 10
-   attempts per IP per hour, counted before any row is written.
+6. ~~Rate limiting~~ **done.** `core/Throttle.php` over `request_throttle`
+   (`core/migrations/002_…`), keyed by action + IP, with
+   `SecurityLog::clientIp()` promoted to public as the single definition of
+   the caller's address (§5.1). `Database::deleteOlderThan()` was added for
+   the prune — `delete()` matches one `column = value` and cannot express a
+   range.
+
+   **It fails open, deliberately**, and Phase D must not lean on it: a failed
+   read returns "not limited". If the table is unreachable the database is
+   unreachable and checkout cannot complete anyway, so failing closed would
+   turn a database problem into a site that refuses every buyer while
+   protecting nothing. Checkout's real guards stay CSRF, the server-side
+   re-pricing, and the `FOR UPDATE` stock check. Item 15 should call
+   `isLimited('checkout', 10, 3600)` then `hit('checkout')`, in that order.
+
+   `hit()` sweeps the table roughly one time in fifty, so it stays bounded
+   whoever calls it; item 18's lazy hold-prune should still call `prune()` on
+   its own pass, as §5.1 said.
+
+   **A bug found while finishing this, and fixed: `public/install.php` never
+   ran core migrations beyond the two `000_*` files it named explicitly.**
+   Demonstrated on the dev database — installed 2026-09-25, yet
+   `core/migrations/001_create_security_log.sql` first applied 2026-10-14, by
+   an update three weeks later. So a freshly installed site had no
+   `security_log` table at all, and the audit trail `SKILL.md` calls a hard
+   rule was silently absent (`SecurityLog::log()` catches its own failure).
+   `request_throttle` would have inherited exactly that: a rate limiter that
+   never limits anything on every new site. The installer now discovers
+   `core/migrations/*.sql` in filename order.
+
+   Note who that fix reaches: `public/install.php` is neither updatable nor a
+   reference file, so it only helps fresh downloads of the kit. Existing sites
+   get `request_throttle` from the updater's own migration glob, which was
+   always correct.
 
 ### Phase B — schema and money (1.8.0)
 
