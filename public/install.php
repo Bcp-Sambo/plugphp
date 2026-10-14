@@ -28,9 +28,15 @@ define('LOCK_FILE', ROOT . '/config/installed.lock');
 if (is_file(ROOT . '/core/Module.php')) {
     require_once ROOT . '/core/Module.php';
 }
+if (is_file(ROOT . '/core/ModuleManager.php')) {
+    require_once ROOT . '/core/ModuleManager.php';
+}
 
 /** Always installed; not shown as togglable in the picker. */
-$ALWAYS_ON = array('home', 'admin-dashboard', 'auth');
+// Single definition, shared with /admin/modules — see core/ModuleManager.php.
+$ALWAYS_ON = class_exists('ModuleManager')
+    ? ModuleManager::ALWAYS_ON
+    : array('home', 'admin-dashboard', 'auth');
 /** Optional modules the site owner can pick. */
 $OPTIONAL = array('about', 'contact-form', 'services', 'projects', 'blog');
 /** Canonical order written into config/modules.php (drives dashboard nav order). */
@@ -217,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // Needed for the fingerprint baseline written at step 6.
             require_once ROOT . '/core/Updater.php';
             require_once ROOT . '/core/SecurityLog.php';
+            require_once ROOT . '/core/ModuleManager.php';
 
             Config::load(ENV_FILE);
 

@@ -24,6 +24,7 @@ require_once __DIR__ . '/../core/Branding.php';
 require_once __DIR__ . '/../core/Upload.php';
 require_once __DIR__ . '/../core/Updater.php';
 require_once __DIR__ . '/../core/SecurityLog.php';
+require_once __DIR__ . '/../core/ModuleManager.php';
 
 Config::load(__DIR__ . '/../.env');
 

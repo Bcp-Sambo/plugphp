@@ -1075,6 +1075,12 @@ final class Updater
                 'The contact form has no spam trap. Submissions still work, but the '
                 . 'bot check has no field to catch anything with.',
             ],
+            'modules/admin-dashboard/views/modules.php' => [
+                '/admin/modules/enable',
+                'Module Management has no screen to render. Modules cannot be turned on '
+                . 'or off from the dashboard, so a module delivered by an update has no '
+                . 'way to be activated short of editing config/modules.php by hand.',
+            ],
             'modules/admin-dashboard/views/updates.php' => [
                 'data-confirm',
                 'Update and Roll back run immediately with no confirmation prompt, and '
@@ -1359,14 +1365,33 @@ final class Updater
                 continue;
             }
             $rel = ltrim(str_replace('\\', '/', substr($f->getPathname(), strlen($staging))), '/');
-            // Reference views are delivered to storage/, never applied.
+            // Reference files are delivered to storage/, never applied.
             if (self::isPackagedView($rel)) {
+                continue;
+            }
+            // A module the owner deleted on purpose stays deleted. Without this
+            // every update would silently put it back, and "remove permanently"
+            // would mean "until the next release".
+            if (self::isIgnoredModulePath($rel)) {
+                self::note('Skipped ' . $rel . ' — its module is on the ignored list.');
                 continue;
             }
             $files[] = $rel;
         }
         sort($files);
         return $files;
+    }
+
+    /** True when this package path belongs to a module the site has deleted on purpose. */
+    private static function isIgnoredModulePath(string $rel): bool
+    {
+        if (!class_exists('ModuleManager')) {
+            return false;
+        }
+        if (!preg_match('#^modules/([a-z0-9-]+)/#', $rel, $m)) {
+            return false;
+        }
+        return ModuleManager::isIgnored($m[1]);
     }
 
     /**

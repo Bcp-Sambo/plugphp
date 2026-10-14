@@ -446,6 +446,7 @@ final class AdminDashboardModule extends Module
         }
 
         // Site-wide config and maintenance last, after the content sections.
+        $items[] = ['label' => 'Modules', 'url' => '/admin/modules', 'admin_only' => true];
         $items[] = ['label' => 'Settings', 'url' => '/admin/settings', 'admin_only' => true];
         $items[] = ['label' => 'Updates', 'url' => '/admin/updates', 'admin_only' => true];
 
@@ -618,6 +619,55 @@ final class AdminDashboardModule extends Module
             . '.pp-stale__h{margin-top:.9rem}'
             . '.pp-stale__act{margin-top:.35rem}'
             . '</style>';
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Module Management
+     * ------------------------------------------------------------------ */
+
+    /**
+     * GET /admin/modules — every module physically present, active or not.
+     *
+     * This list is the one place a disabled module always stays visible. It is
+     * how one gets switched back on, so it is never filtered by enabled state.
+     */
+    public static function modulesPage(): void
+    {
+        self::renderAdmin(__DIR__ . '/views/modules.php', [
+            'modules'  => ModuleManager::overview(),
+            'ignored'  => ModuleManager::ignored(),
+            'activity' => class_exists('SecurityLog') ? SecurityLog::recent(15) : [],
+            'flash'    => self::takeFlash(),
+        ]);
+    }
+
+    /**
+     * POST /admin/modules/{enable,disable,remove} — one module per request.
+     *
+     * The module name arrives from a form and is passed straight to
+     * ModuleManager, which validates it against a pattern AND against what is
+     * actually installed before touching anything. Nothing here is trusted to
+     * have sanitised it first.
+     */
+    public static function moduleAction(string $action): void
+    {
+        $name = (string) ($_POST['module'] ?? '');
+
+        $result = match ($action) {
+            'enable'  => ModuleManager::enable($name),
+            'disable' => ModuleManager::disable($name),
+            'remove'  => ModuleManager::removePermanently($name),
+            default   => ['success' => false, 'message' => 'Unknown action.'],
+        };
+
+        $_SESSION['pp_settings_flash'] = [
+            'errors'  => $result['success'] ? [] : [$result['message']],
+            'success' => $result['success'] ? $result['message'] : '',
+        ];
+
+        http_response_code(302);
+        header('Location: ' . Url::to('/admin/modules'));
+        exit;
     }
 
     /**
