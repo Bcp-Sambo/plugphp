@@ -27,7 +27,7 @@ with **no Composer step**. Only re-run Composer if you change dependencies.
 Either clone it or grab the ZIP from GitHub:
 
 ```bash
-git clone https://github.com/<your-username>/plugPHP.git
+git clone https://github.com/Bcp-Sambo/plugphp.git
 cd plugPHP
 ```
 
