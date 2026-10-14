@@ -26,6 +26,11 @@ Thumbs.db
 # Update machinery working directories (created at runtime, never committed)
 /storage/update-tmp/
 /storage/backups/
+/storage/pending-views/
+# Copies kept aside when a delivered file replaces a customised one.
+*.replaced-*
+# Per-site fingerprint baseline, written at install and at each update.
+/storage/reference-baseline.json
 /dist/
 
 # Local working notes (not part of the template)

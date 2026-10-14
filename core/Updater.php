@@ -26,7 +26,7 @@ final class Updater
      * package (it lives in core/, which is overwritable), so it updates itself
      * when a package is applied.
      */
-    public const VERSION = '1.4.0';
+    public const VERSION = '1.5.0';
 
     /**
      * Where the update feed lives. HARDCODED ON PURPOSE — never read from
@@ -65,6 +65,12 @@ final class Updater
         '#^modules/[a-z0-9-]+/routes\.php$#',
         '#^modules/[a-z0-9-]+/migrations/[A-Za-z0-9_.-]+\.sql$#',
         '#^public/index\.php$#',
+        // One exact filename per module, not .json generally: the allowlist
+        // only means something while every entry is something specific.
+        // Added here a release BEFORE any manifest ships, because this check
+        // runs on the RECEIVING site — a package is refused by the rules the
+        // site already has, not the rules it is about to receive.
+        '#^modules/[a-z0-9-]+/manifest\.json$#',
     ];
 
     /** Settings keys. */
@@ -359,6 +365,14 @@ final class Updater
             }
             self::note('Backed up ' . count($files) . ' file(s) to ' . basename($backup) . '.');
 
+            // Record the checksums this site has been running against before
+            // they are overwritten. Captured here because after the copy the
+            // old manifest is gone, and without it a customised file is
+            // indistinguishable from a merely outdated one.
+            if (self::saveBaseline()) {
+                self::note('Recorded the current file fingerprints as the comparison baseline.');
+            }
+
             // 7. Apply.
             $applied = self::apply($staging, $files);
             if ($applied !== true) {
@@ -393,6 +407,15 @@ final class Updater
             Settings::set(self::KEY_VERSION, $manifest['version']);
             Settings::set(self::KEY_UPDATED, (string) time());
             Settings::set(self::KEY_ROLLBACK, basename($backup));
+
+            // A site updating from before fingerprinting existed had no manifest
+            // to snapshot, so the pre-apply baseline capture found nothing. Seed
+            // it from what this release ships: a file the owner never touched now
+            // matches the baseline exactly, and one they customised reads as
+            // customised rather than as a mystery.
+            if (self::seedBaseline()) {
+                self::note('Recorded this release\'s fingerprints as the first baseline.');
+            }
 
             self::cleanup($staging, $zipPath);
             self::note('Updated to version ' . $manifest['version'] . '.');
@@ -528,9 +551,9 @@ final class Updater
      *    site. One exception sits inside public/uploads/: the .htaccess there
      *    is hardening this project ships, not content the owner owns, and it
      *    carries the fix for uploads returning 500 on mod_php hosts.
-     *  - files that are meant to be ABSENT — install.php and health.php are
-     *    deleted after use, so offering to restore them would put a setup tool
-     *    back onto a live server.
+     *  - files that are meant to be ABSENT — install.php, health.php and
+     *    upgrade.php are deleted after use, so offering to restore them would
+     *    put a setup tool back onto a live server.
      *  - install-time only — sample content is read once by the installer and
      *    never again.
      *  - documentation and build tooling — nothing to apply.
@@ -541,7 +564,8 @@ final class Updater
     private const REFERENCE_EXCLUDE = '#^('
         . 'config/modules\.php|\.env|\.env\.example|\.gitignore|\.github/|tools/'
         . '|composer\.(json|lock)|public/uploads/(?!\.htaccess$)|public/assets/img/'
-        . '|public/install\.php|public/health\.php|resources/sample-content\.php'
+        . '|public/install\.php|public/health\.php|public/upgrade\.php'
+        . '|resources/sample-content\.php'
         . '|LICENSE|README\.md|docs/|.*SKILL\.md'
         . ')#';
 
@@ -570,18 +594,30 @@ final class Updater
             || str_ends_with($rel, '/.htaccess');
     }
 
-    /** True for a package path carrying a deliverable view. */
+    /**
+     * True for a package path carrying a deliverable reference file.
+     *
+     * Two ways to qualify, and the reason there are two is forward
+     * compatibility: the hand-written requiredViews() set is what releases
+     * before fingerprinting carried, and isReferenceFile() is the rule that
+     * replaces it. Accepting both means a release built after this one can
+     * widen what it delivers without this version rejecting the package —
+     * and a package is always judged by the code the receiving site is
+     * already running.
+     *
+     * Traversal is still refused outright rather than filtered: isReferenceFile()
+     * rejects '..', absolute paths and the empty string before considering
+     * anything else, so no crafted path reaches the staging copy.
+     */
     public static function isPackagedView(string $rel): bool
     {
         if (!str_starts_with($rel, self::VIEW_PACKAGE_PREFIX)) {
             return false;
         }
-        $view = substr($rel, strlen(self::VIEW_PACKAGE_PREFIX));
+        $file = substr($rel, strlen(self::VIEW_PACKAGE_PREFIX));
 
-        // Membership of the known set is the whole check. A path is never
-        // trusted because it "looks like" a view — traversal and surprises
-        // both fail simply by not being on the list.
-        return array_key_exists($view, self::requiredViews());
+        return array_key_exists($file, self::requiredViews())
+            || self::isReferenceFile($file);
     }
 
     /**
@@ -631,7 +667,9 @@ final class Updater
      */
     public static function applyPendingView(string $rel): array
     {
-        if (!array_key_exists($rel, self::requiredViews())) {
+        // The name arrives from a form post and is about to address the disk,
+        // so it is checked against the rule rather than merely cleaned up.
+        if (!array_key_exists($rel, self::requiredViews()) && !self::isReferenceFile($rel)) {
             return ['success' => false, 'message' => 'That is not a file this release provides.'];
         }
 
@@ -694,7 +732,7 @@ final class Updater
         self::protectDirectory($base);
 
         $n = 0;
-        foreach (array_keys(self::requiredViews()) as $rel) {
+        foreach (self::stagedPackagePaths($src) as $rel) {
             $from = $src . '/' . $rel;
             if (!is_file($from)) {
                 continue;
@@ -711,6 +749,298 @@ final class Updater
 
         return $n;
     }
+
+    /**
+     * Reference paths actually present in an extracted package.
+     *
+     * Re-validated here even though stagePackage() already refused anything
+     * unacceptable. The cost is one regex per file; the alternative is that a
+     * single future change to the extraction path silently becomes a way to
+     * write outside storage/.
+     *
+     * @return array<int, string>
+     */
+    private static function stagedPackagePaths(string $src): array
+    {
+        if (!is_dir($src)) {
+            return [];
+        }
+
+        $out = [];
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($src, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($it as $f) {
+            /** @var SplFileInfo $f */
+            if (!$f->isFile()) {
+                continue;
+            }
+            $rel = ltrim(str_replace('\\', '/', substr($f->getPathname(), strlen($src))), '/');
+            if (self::isPackagedView(self::VIEW_PACKAGE_PREFIX . $rel)) {
+                $out[] = $rel;
+            }
+        }
+
+        sort($out);
+        return $out;
+    }
+
+    /* ============================================================== *
+     * Fingerprinting
+     * ============================================================== */
+
+    /**
+     * Where each release records the checksum of every file it delivers.
+     *
+     * A PHP file under core/ ON PURPOSE, not a .json at the package root.
+     * stagePackage() rejects a package whole when it contains any path
+     * outside the updatable set, and that check runs using the code the
+     * RECEIVING site is already running. A .json would therefore be refused
+     * by every site built before this feature existed — the release could
+     * not be installed by the sites that most need it. core/*.php is already
+     * in SAFE_PATTERNS, so this file reaches an older site harmlessly: it is
+     * copied into place and simply never read until that site is running
+     * this version of the updater.
+     */
+    private const MANIFEST_FILE = 'core/ReferenceManifest.php';
+
+    /**
+     * The manifest the site had BEFORE its most recent update.
+     *
+     * This is what makes "did the owner change this file, or is it just old?"
+     * answerable. Without it the two are indistinguishable and every drifted
+     * file has to be reported with the same unhelpful shrug.
+     */
+    private const BASELINE_FILE = 'storage/reference-baseline.json';
+
+    /** Hash one file the same way the manifest does. Null when unreadable. */
+    public static function fingerprint(string $abs): ?string
+    {
+        if (!is_file($abs) || !is_readable($abs)) {
+            return null;
+        }
+        $h = @sha1_file($abs);
+        return is_string($h) ? $h : null;
+    }
+
+    /**
+     * Every project-relative path an update delivers as a reference copy.
+     *
+     * Walks the tree and applies isReferenceFile() rather than reading a
+     * list, so a file added to the project is covered the moment it exists.
+     * Forgetting to register something is the failure this replaces.
+     *
+     * @return array<int, string>
+     */
+    public static function referenceCandidates(): array
+    {
+        $root = self::root();
+        $out = [];
+
+        $skipDir = '#^(vendor|storage|dist|\.git|node_modules)(/|$)#';
+
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($it as $f) {
+            /** @var SplFileInfo $f */
+            $rel = ltrim(str_replace('\\', '/', substr($f->getPathname(), strlen($root))), '/');
+            if ($rel === '' || preg_match($skipDir, $rel)) {
+                continue;
+            }
+            if ($f->isFile() && self::isReferenceFile($rel)) {
+                $out[] = $rel;
+            }
+        }
+
+        sort($out);
+        return $out;
+    }
+
+    /**
+     * The checksums shipped with the code currently on disk — "what this
+     * version of PlugPHP says these files should contain".
+     *
+     * @return array{version:string, files:array<string,string>}
+     */
+    public static function currentManifest(): array
+    {
+        $path = self::root() . '/' . self::MANIFEST_FILE;
+        if (!is_file($path)) {
+            return ['version' => self::VERSION, 'files' => []];
+        }
+
+        $data = @include $path;
+        return self::normaliseManifest($data);
+    }
+
+    /**
+     * The checksums from the release this site was running BEFORE its last
+     * update. Null when the site has never updated since fingerprinting
+     * shipped, in which case customisation cannot be distinguished from age.
+     *
+     * @return array{version:string, files:array<string,string>}|null
+     */
+    public static function baselineManifest(): ?array
+    {
+        $path = self::root() . '/' . self::BASELINE_FILE;
+        if (!is_file($path)) {
+            return null;
+        }
+        $data = json_decode((string) @file_get_contents($path), true);
+        if (!is_array($data)) {
+            return null;
+        }
+        return self::normaliseManifest($data);
+    }
+
+    /** Shape-check a manifest from any source. Unknown keys are dropped. */
+    private static function normaliseManifest(mixed $data): array
+    {
+        $version = '';
+        $files = [];
+
+        if (is_array($data)) {
+            if (isset($data['version']) && is_string($data['version'])) {
+                $version = $data['version'];
+            }
+            if (isset($data['files']) && is_array($data['files'])) {
+                foreach ($data['files'] as $rel => $hash) {
+                    // Never trust a path out of a file; it addresses the disk.
+                    if (!is_string($rel) || !is_string($hash)) {
+                        continue;
+                    }
+                    if (!preg_match('/^[a-f0-9]{40}$/i', $hash)) {
+                        continue;
+                    }
+                    if (!self::isReferenceFile($rel)) {
+                        continue;
+                    }
+                    $files[$rel] = strtolower($hash);
+                }
+            }
+        }
+
+        return ['version' => $version, 'files' => $files];
+    }
+
+    /**
+     * Snapshot the manifest currently on disk as the baseline.
+     *
+     * Called immediately BEFORE an update overwrites core/, so that what is
+     * saved is the set of checksums the site has been running against — the
+     * "what you should have had" half of the comparison.
+     */
+    private static function saveBaseline(): bool
+    {
+        $current = self::currentManifest();
+        if (!$current['files']) {
+            return false; // nothing worth recording; keep any existing baseline
+        }
+
+        $path = self::root() . '/' . self::BASELINE_FILE;
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+            return false;
+        }
+        self::protectDirectory($dir);
+
+        return (bool) @file_put_contents(
+            $path,
+            json_encode($current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    /**
+     * Write the baseline from the manifest on disk, for a site that has one
+     * but has never recorded a baseline — a fresh install, or the first run
+     * after this feature arrives. Public so install.php can call it.
+     */
+    public static function seedBaseline(): bool
+    {
+        if (self::baselineManifest() !== null) {
+            return false;
+        }
+        return self::saveBaseline();
+    }
+
+    /* -- classification ------------------------------------------------ */
+
+    public const FILE_CURRENT    = 'current';
+    public const FILE_BEHIND     = 'behind';
+    public const FILE_CONFLICT   = 'conflict';
+    public const FILE_CUSTOMISED = 'customised';
+    public const FILE_UNKNOWN    = 'unknown';
+    public const FILE_MISSING    = 'missing';
+
+    /**
+     * Compare what the site has, what it should have had, and what this
+     * release ships — for every reference file.
+     *
+     * Three inputs, not two. "Your copy differs from ours" alone cannot tell
+     * a customised file from a stale one, and treating those the same is what
+     * makes an update either destroy someone's design work or say nothing at
+     * all about a file that is genuinely out of date.
+     *
+     *   live == current                      -> current     (say nothing)
+     *   live == baseline, current moved on   -> behind      (safe to apply)
+     *   live != baseline, current moved on   -> conflict    (show, then choose)
+     *   live != baseline, current unchanged  -> customised  (their call, stays)
+     *   no baseline, live != current         -> unknown     (cannot tell)
+     *   file absent                          -> missing
+     *
+     * @return array<int, array{file:string,status:string,staged:bool,effect:string}>
+     */
+    public static function referenceStatus(): array
+    {
+        $root     = self::root();
+        $current  = self::currentManifest()['files'];
+        $baseline = self::baselineManifest();
+        $base     = $baseline['files'] ?? [];
+        $enabled  = self::enabledModuleNames();
+        $views    = self::requiredViews();
+
+        $out = [];
+
+        foreach ($current as $rel => $want) {
+            // A module's files are irrelevant on a site that does not run it.
+            if (preg_match('#^modules/([a-z0-9-]+)/#', $rel, $m) && !in_array($m[1], $enabled, true)) {
+                continue;
+            }
+
+            $live = self::fingerprint($root . '/' . $rel);
+            $had  = $base[$rel] ?? null;
+
+            if ($live === null) {
+                $status = self::FILE_MISSING;
+            } elseif ($live === $want) {
+                $status = self::FILE_CURRENT;
+            } elseif ($had === null) {
+                $status = self::FILE_UNKNOWN;
+            } elseif ($live === $had && $want !== $had) {
+                $status = self::FILE_BEHIND;
+            } elseif ($live !== $had && $want !== $had) {
+                $status = self::FILE_CONFLICT;
+            } else {
+                $status = self::FILE_CUSTOMISED;
+            }
+
+            if ($status === self::FILE_CURRENT || $status === self::FILE_CUSTOMISED) {
+                continue; // nothing to tell the admin about
+            }
+
+            $out[] = [
+                'file'   => $rel,
+                'status' => $status,
+                'staged' => is_file($root . '/' . self::PENDING_VIEW_DIR . '/' . $rel),
+                'effect' => $views[$rel][1] ?? '',
+            ];
+        }
+
+        return $out;
+    }
+
     /* ============================================================== *
      * Stale view detection
      * ============================================================== */
@@ -1233,6 +1563,19 @@ final class Updater
         return (is_string($from) && preg_match('/^\d+\.\d+\.\d+$/', $from)) ? $from : null;
     }
     /** Run every core and module migration not yet in migrations_log. */
+    /**
+     * Run every outstanding migration for the enabled modules.
+     *
+     * Public wrapper so the one-time catch-up script can bring an old site's
+     * schema forward without reimplementing the loop — and so a module enabled
+     * long after it shipped can have its own migrations run at that moment.
+     * Safe to call repeatedly: migrations_log makes each file a no-op once run.
+     */
+    public static function runMigrations(): int
+    {
+        return self::runPendingMigrations();
+    }
+
     private static function runPendingMigrations(): int
     {
         $root = self::root();
