@@ -1,0 +1,24 @@
+# This branch carries only the update feed.
+#
+# A .gitignore here is a safety rail, not housekeeping: switching to this
+# branch from main leaves main untracked and ignored files sitting in the
+# working tree — .env among them. Without this file .env is untracked AND
+# unignored here, so one "git add -A" on the wrong branch would publish a
+# site DB password, APP_KEY and SMTP credentials to a public repository.
+
+/.env
+/config/
+/core/
+/modules/
+/public/
+/resources/
+/storage/
+/tools/
+/docs/
+/vendor/
+/dist/
+/composer.json
+/composer.lock
+/LICENSE
+/SKILL.md
+/NEXT-SESSION.md
