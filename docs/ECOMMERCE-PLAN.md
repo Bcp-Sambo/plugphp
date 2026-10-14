@@ -117,9 +117,9 @@ accept 1.6.0, let alone a later one.
 
 ### Phase A — core plumbing (1.7.0, no ecommerce code)
 
-**Status:** items 1 and 2 are **done** — `Database::transaction()` is in
-`core/Database.php:155` and `tools/test-stock-locking.php` proves it. Items
-3–6 remain.
+**Status:** items 1, 2 and 3 are **done** — `Database::transaction()` in
+`core/Database.php:155` with `tools/test-stock-locking.php`, and `core/Http.php`
+with `tools/test-http.php`. Items 4–6 remain.
 
 1. ~~`Database::transaction(callable $fn): mixed`~~ **done.**
    Begin/commit/rollback around a closure, rethrowing after rollback, return
@@ -146,9 +146,30 @@ accept 1.6.0, let alone a later one.
    `-1` behind as evidence. `Database::update()` cannot express that; it takes
    literal values, so this needs its own named method in `Database` when
    Phase E is built.
-3. `core/Http.php` — `postJson($url, $payload, $headers, $timeout)` and
-   `getJson(...)`. TLS verification on, no redirects followed by default, a
-   byte cap, and no secret ever written to a log.
+3. ~~`core/Http.php`~~ **done.** `postJson()` and `getJson()`, returning
+   `['ok', 'status', 'data', 'error']`. TLS verification and HTTPS-only are
+   **not parameters** — there is no way to switch them off, deliberately.
+   Redirects are never followed (a 3xx would re-send the `Authorization`
+   header to a host the response named), responses cap at 1 MB enforced as
+   bytes arrive, and no header, body or query string is ever logged.
+
+   Two things that fell out of building it, both of which touch Phase E:
+
+   - **`ok => false` means "we do not know", never "it failed."** `data` is
+     `[]` on every failure, so item 21's verify-before-paid falls through to
+     "not paid" even if a caller forgets to check `ok`. A timeout must leave
+     the order `pending` and re-verifiable (item 23), and the gateway classes
+     must not treat a transport failure as a declined payment.
+   - **A 4xx/5xx with a JSON body still returns `data`**, because gateways put
+     their reason codes there. `ok` is the only thing that says whether the
+     call succeeded.
+
+   `tools/test-http.php` covers it against a real TLS server using a
+   throwaway certificate authority — both the curl and the stream-wrapper
+   transports, plus a run with the CA untrusted that must fail to connect.
+   Verified that sabotaging each guarantee (TLS verification, the redirect
+   policy, the byte cap, the log scrubbing) fails exactly the matching
+   assertion and no others.
 4. Widen `SAFE_PATTERNS` with
    `#^modules/[a-z0-9-]+/[A-Z][A-Za-z0-9]*/[A-Z][A-Za-z0-9]*\.php$#` — one
    level of subdirectory, PascalCase on both halves so it can never match

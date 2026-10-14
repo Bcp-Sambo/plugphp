@@ -209,3 +209,7 @@ defaults, and never rename or drop a column that shipped code still reads.
       It must report PASS on all three sections — the unguarded control is
       expected to oversell, and a *clean* control means the race never
       collided and the guarded result proved nothing.
+- [ ] `php tools/test-http.php` passes if `core/Http.php` or any gateway call
+      changed. It generates its own certificate authority and needs no network
+      access; the third section must FAIL to connect, which is what proves
+      certificate verification is on.

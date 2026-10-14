@@ -8,6 +8,7 @@ Every class is `final` and uses static methods (no instances to wire up).
 
 - [Config](#config) · [Database](#database) · [Auth](#auth) · [View & `e()`](#view--e)
 - [Router](#router) · [Module](#module) · [Settings](#settings) · [Mailer](#mailer) · [Upload](#upload)
+- [Http](#http) · [Crypto](#crypto) · [Updater](#updater) · [SecurityLog](#securitylog)
 
 ---
 
@@ -566,3 +567,65 @@ What it guarantees (see [Security](security.md) for the full rationale):
 
 Requires the `gd` extension. Callers typically wrap the call in `try/catch` and
 put the error into their form's validation errors (see `BlogModule::uploadFeatured`).
+
+---
+
+## Http
+
+`core/Http.php` — the only approved way to make an outbound request. Two
+methods, both JSON, because the only thing this project calls out to is a
+payment gateway's REST API.
+
+```php
+$res = Http::postJson($url, $payload, ['Authorization' => 'Bearer ' . $key]);
+$res = Http::getJson($url, ['Authorization' => 'Bearer ' . $key], 10); // timeout in seconds
+
+// [ 'ok' => bool, 'status' => int, 'data' => array, 'error' => ?string ]
+```
+
+**`ok => false` means "we do not know what happened", not "the operation
+failed."** For a payment verification those are opposite outcomes: a timeout
+must leave the order `pending` and re-verifiable, never mark it failed. `data`
+is `[]` on every failure, so a caller that checks `$res['data']['status']`
+without checking `ok` still falls through to "not paid".
+
+A 4xx or 5xx carrying a readable JSON body gives `ok => false` **with `data`
+populated** — gateways put their reason codes there and the caller needs them.
+A 2xx with an empty body (a 204) is `ok => true` with empty `data`.
+
+Transport problems are returned, not thrown: a gateway timing out is an
+expected condition on shared hosting, and the payment return page still has to
+render something for the customer.
+
+What it guarantees, none of it configurable:
+
+1. **HTTPS only** — an `http://` URL is refused, not upgraded, and a URL
+   carrying `user:pass@` credentials is refused too.
+2. **Certificate verification always on.** There is no parameter to disable
+   it, so no amount of "just make it work" produces a request that accepts any
+   certificate.
+3. **Redirects are never followed.** A 3xx would re-send the `Authorization`
+   header to a host chosen by the response — a secret-leak primitive, and no
+   gateway needs it.
+4. **Responses are capped** at 1 MB, enforced as bytes arrive.
+5. **Nothing that can carry a secret is logged** — no headers, no request
+   body, and no query string. Transport messages are scrubbed of URLs before
+   they are returned or logged, because PHP's own stream warnings quote the
+   full URL.
+6. Header names and values are rejected if they contain CR or LF (a key pasted
+   with a trailing newline is a real occurrence); the error names the header
+   but never repeats the value.
+
+Timeouts default to 15s and are clamped to 30s, because shared hosting often
+caps `max_execution_time` at 30 and a request that outlives it is killed
+mid-flight.
+
+Works with curl, and falls back to the stream wrapper on hosts built without
+it. `tools/test-http.php` runs the full assertion set against a real TLS
+server on **both** transports, plus a run with the certificate authority
+deliberately untrusted to prove verification is really on.
+
+`Updater::httpGet()` stays separate and private: it fetches the file that can
+overwrite `core/`, so its host allowlist, redirect policy and byte cap are
+decided in the class that acts on them rather than inherited from a
+general-purpose helper something else might widen.

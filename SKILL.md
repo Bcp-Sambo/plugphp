@@ -296,6 +296,46 @@ value fails its authentication check, so a corrupted row degrades to "not
 configured". Check `Crypto::hasKey()` before saving, and refuse to store the
 secret if it is false — never fall back to storing it in the clear.
 
+## Outbound HTTP requests
+
+`core/Http.php` is the only approved way to call a remote API.
+
+```php
+$res = Http::postJson(
+    'https://api.example.com/transaction/initialize',
+    ['amount' => $kobo, 'email' => $email],
+    ['Authorization' => 'Bearer ' . $secretKey]
+);
+
+if (!$res['ok']) { /* we do NOT know what happened — see below */ }
+$reference = $res['data']['data']['reference'] ?? null;
+```
+
+Never use curl, `file_get_contents()` on a URL, `fsockopen()` or a stream
+wrapper directly in a module. `Http` is HTTPS-only, always verifies the
+certificate, never follows a redirect, caps the response size, and keeps
+headers and query strings out of the log. **There is no parameter to turn
+verification off** — if a gateway's TLS is broken, that is the gateway's bug
+to fix, not ours to work around.
+
+**`ok => false` means "we do not know", not "it failed."** A timeout on a
+payment verification must leave the order `pending` and re-verifiable — never
+mark it failed or unpaid. `data` is `[]` on every failure, so a caller that
+reads `$res['data']['status']` without checking `ok` falls through to "not
+paid" rather than to "paid".
+
+The URL always comes from code — an endpoint constant in a gateway class.
+Never pass a URL from the database, from a request, or from a previous API
+response: `Http` does no host allowlisting, so that is a server-side request
+forgery waiting to happen.
+
+Redirects are refused for a specific reason: a 3xx would re-send the
+`Authorization` header to whatever host the response named. That is a
+secret-leak primitive, and no gateway API needs it.
+
+`tools/test-http.php` proves all of the above against a real TLS server with
+a throwaway certificate authority. Run it after touching `core/Http.php`.
+
 ## Tracking pixel IDs
 
 Tracking IDs are interpolated **inside an inline `<script>` block**. `e()` does
